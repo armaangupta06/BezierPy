@@ -31,6 +31,9 @@ that two Cubic Beziér Splines would have at the point. This results in a smooth
 ```python
 graph_path(path_with_points(Point(0, 0), Point(1, 1), Point(0, 1), initial_heading=0, final_heading=-90))
 ```
+
+![example_spline](https://user-images.githubusercontent.com/68565234/184724709-2184023c-eae2-47af-9ced-7c19d4bf8e89.png)
+
 ## Acknowledgements
 
  - [Planning Motion Trajectories for Mobile Robots Using Splines](https://awesomeopensource.com/project/elangosundar/awesome-README-templates)
