@@ -1,20 +1,36 @@
 import numpy as np
 from Pose import *
 import matplotlib.pyplot as plt
+from Quintic_bezier import Quintic_bezier
 
-def graph_path(path):
+def graph_path(data):
     """Graphs points of path using matplotlib"""
-    for P in path:
-        plt.scatter(P.x, P.y, color="black")
 
+    fig, axis = plt.subplots(2)
+
+    for P in data[0]:
+        axis[0].scatter(P.x, P.y, color="black")
+
+    axis[0].set_xlim([-0.25, 4])
+    axis[0].set_ylim([0, 4])
+    axis[0].set_title("Points")
+
+    for C in range(len(data[1])):
+        # print(C, data[1][C])
+        axis[1].scatter(C, data[1][C], color="black")
+
+    axis[1].set_xlim([0, 200])
+    axis[1].set_ylim([-10, 8])
+    axis[1].set_title("Curvature")
     plt.show()
 
 
-def path_with_points(*points, initial_heading, final_heading=None):
+def path_with_points(*points, initial_heading, final_heading=None, tangent_magnitude = 1/2):
     """Spline interpolation between waypoints using an arbitrary number of waypoints and initial/final heading."""
 
     # List which holds discrete points from the quintic beziér curves
     path = []
+    curvature = []
 
     # Converts initial and final heading to radians from degrees
     initial_heading *= (math.pi / 180)
@@ -23,80 +39,99 @@ def path_with_points(*points, initial_heading, final_heading=None):
 
     # Iterates through waypoints and creates path
     for curr in range(len(points) - 1):
-        control_points = calc_control_points_with_points(curr, points, initial_heading, final_heading)
-        for i in control_points:
-            plt.scatter(i.x, i.y)
+        curve = calc_bezier_curve_with_points(curr, points, initial_heading, final_heading, tangent_magnitude)
+
         # Change increment to change number of discrete points per curve
-        for t in np.arange(0, 1, 0.01):
-            p = quintic_bezier(control_points[0], control_points[1], control_points[2], control_points[3], control_points[4],
-                               control_points[5], t)
+        for t in np.arange(0, 1.01, 0.01):
+            p = curve.get_point(t)
+            w = curve.calc_curvature(t)
             path.append(p)
+            curvature.append(w)
 
-    return path
+
+    return path, curvature
 
 
-def path_with_poses(*poses):
+def path_with_poses(*poses, tangent_magnitude = 1/2):
     """Spline interpolation between waypoints using an arbitrary number of poses."""
 
     # List which holds discrete points from quintic beziér curves
     path = []
+    curvature = []
 
     # Iterates through waypoints and creates path
     for curr in range(len(poses) - 1):
-        control_points = calc_control_points_with_poses(curr, poses)
-        for i in control_points:
-            plt.scatter(i.x, i.y)
+        curve = calc_bezier_curve_with_poses(curr, poses, tangent_magnitude=tangent_magnitude)
         for t in np.arange(0, 1, 0.01):
-            p = quintic_bezier(control_points[0], control_points[1], control_points[2], control_points[3], control_points[4],
-                               control_points[5], t)
+            p = curve.get_point(t)
+            w = curve.calc_curvature(t)
             path.append(p)
+            curvature.append(w)
 
-    return path
+    return path, curvature
 
 
-def calc_control_points_with_poses(curr, path):
-    """Calculates control points of quintic beziér curve if given an arbitrary number of poses."""
+def calc_bezier_curve_with_poses(curr, path, tangent_magnitude):
+    """Calculates control points of quintic bezier curve if given an arbitrary number of points and
+    initial/final heading. """
 
-    # Unit vector expressing robot's initial and final heading. Used to calculate first derivative.
-    v0 = Point(math.sin(path[curr].heading), math.cos(path[curr + 1].heading))
+    # Unit vector expressing robot's initial and final heading. Used to calculate first and second derivatives
+    v0 = Point(math.sin(path[curr].heading), math.cos(path[curr].heading))
     v1 = Point(math.sin(path[curr + 1].heading), math.cos(path[curr + 1].heading))
 
-    # If the current point is the starting point
+    # If current point is the first point of the path
     if curr == 0:
-        # If the path length is only two points
+
+        #If the path is only two points long
         if len(path) == 2:
-            # Calculate magnitude between nearest point and initial point.
-            magnitudev0 = (1 / 2) * magnitude(path[curr + 1] - path[curr])
+            magnitudev0 = tangent_magnitude * magnitude(path[curr + 1] - path[curr])
 
             # Multiply unit vector by magnitude to calculate first derivative of robot
             v0 *= magnitudev0
             v1 *= magnitudev0
 
-            # Calculate second derivative
             acc0 = -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1]
             acc1 = 6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]
-
         else:
-            magnitudev0 = (1 / 2) * magnitude(path[curr + 1] - path[curr])
-            magnitudev1 = (1 / 2) * min(magnitude(path[curr + 1] - path[curr]),
+
+            #Calculate magnitude of tangent vectors. Equal to tangent_magnitude * the minimum of the distance to
+            #the neighboring points.
+
+            if curr + 3 == len(path):
+                magnitudevD = tangent_magnitude * magnitude(path[curr + 2] - path[curr + 1])
+                vD = Point(math.sin(path[curr+2].heading), math.cos(path[curr+2].heading)) * magnitudevD
+            else:
+                magnitudevD = tangent_magnitude * min(magnitude(path[curr + 2] - path[curr + 1]),
+                                                      magnitude(path[curr + 3] - path[curr + 2]))
+                vD = Point(math.sin(path[curr+2].heading), math.cos(path[curr+2].heading)) * magnitudevD
+
+            magnitudev0 = tangent_magnitude * magnitude(path[curr + 1] - path[curr])
+            magnitudev1 = tangent_magnitude * min(magnitude(path[curr + 1] - path[curr]),
                                         magnitude(path[curr + 2] - path[curr + 1]))
             v0 *= magnitudev0
             v1 *= magnitudev1
 
-            # Calculate weight of each line segment
             alpha = (magnitude(path[curr + 2] - path[curr + 1])) / (
                         magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
             beta = (magnitude(path[curr + 1] - path[curr])) / (
                         magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
 
+            #Calculate second derivative
             acc0 = -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1]
             acc1 = alpha * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta * (
-                        -6 * path[curr + 1] - 4 * v0 - 2 * v1 + 6 * path[curr + 2])
+                    -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
 
-    # If the current point is the last point
+    # If point is second to last point on path
     elif curr == len(path) - 2:
-        magnitudev0 = (1 / 2) * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
-        magnitudev1 = (1 / 2) * magnitude(path[curr] - path[curr - 1])
+        if curr - 1 == 0:
+            magnitudevA = tangent_magnitude * magnitude(path[curr] - path[curr-1])
+            vA = Point(math.sin(path[curr-1].heading), math.cos(path[curr-1].heading)) * magnitudevA
+        else:
+            magnitudevA = tangent_magnitude * min(magnitude(path[curr-2] - path[curr - 1]), magnitude(path[curr] - path[curr - 1]))
+            vA = Point(math.sin(path[curr-1].heading), math.cos(path[curr-1].heading)) * magnitudevA
+
+        magnitudev0 = tangent_magnitude * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
+        magnitudev1 = tangent_magnitude * magnitude(path[curr+1] - path[curr])
 
         v0 *= magnitudev0
         v1 *= magnitudev1
@@ -106,14 +141,30 @@ def calc_control_points_with_poses(curr, path):
         beta = (magnitude(path[curr] - path[curr - 1])) / (
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
 
-        acc0 = alpha * (6 * path[curr - 1] + 2 * v0 + 4 * v1 - 6 * path[curr]) + beta * (
+        acc0 = alpha * (6 * path[curr - 1] + 2 * vA + 4 * v0 - 6 * path[curr]) + beta * (
                     -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1])
         acc1 = 6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]
 
-    #If the current point is in the middle of the path
+    #If point is in the middle of the path
     else:
-        magnitudev0 = (1 / 2) * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
-        magnitudev1 = (1 / 2) * min(magnitude(path[curr + 1] - path[curr]), magnitude(path[curr + 2] - path[curr + 1]))
+        if curr - 1 == 0:
+            magnitudevA = tangent_magnitude * magnitude(path[curr] - path[curr-1])
+            vA = Point(math.sin(path[curr-1].heading), math.cos(path[curr-1].heading)) * magnitudevA
+        else:
+            magnitudevA = tangent_magnitude * min(magnitude(path[curr-2] - path[curr - 1]), magnitude(path[curr] - path[curr - 1]))
+            vA = Point(math.sin(path[curr-1].heading), math.cos(path[curr-1].heading)) * magnitudevA
+
+        # If two points ahead is last point on path
+        if curr + 2 == len(path) - 1:
+            magnitudevD = tangent_magnitude * magnitude(path[curr + 2] - path[curr + 1])
+            vD = Point(math.sin(path[curr + 2].heading), math.cos(path[curr + 2].heading)) * magnitudevD
+        else:
+            magnitudevD = tangent_magnitude * min(magnitude(path[curr + 2] - path[curr + 1]),
+                                                  magnitude(path[curr + 3] - path[curr + 2]))
+            vD = Point(math.sin(path[curr + 2].heading), math.cos(path[curr + 2].heading)) * magnitudevD
+
+        magnitudev0 = tangent_magnitude * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
+        magnitudev1 = tangent_magnitude * min(magnitude(path[curr + 1] - path[curr]), magnitude(path[curr + 2] - path[curr + 1]))
 
         v0 *= magnitudev0
         v1 *= magnitudev1
@@ -122,17 +173,18 @@ def calc_control_points_with_poses(curr, path):
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
         beta0 = (magnitude(path[curr] - path[curr - 1])) / (
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
+
         alpha1 = (magnitude(path[curr + 2] - path[curr + 1])) / (
                     magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
         beta1 = (magnitude(path[curr + 1] - path[curr])) / (
                     magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
 
-        acc0 = alpha0 * (6 * path[curr - 1] + 2 * v0 + 4 * v1 - 6 * path[curr]) + beta0 * (
+        acc0 = alpha0 * (6 * path[curr - 1] + 2 * vA + 4 * v0 - 6 * path[curr]) + beta0 * (
                     -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1])
         acc1 = alpha1 * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta1 * (
-                    -6 * path[curr + 1] - 4 * v0 - 2 * v1 + 6 * path[curr + 2])
+                    -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
 
-    #Calculate control points using first and second derivatives
+    #Calculate control points based on first and second derivative
     point0 = path[curr]
     point5 = path[curr + 1]
     point1 = (1 / 5) * v0 + point0
@@ -140,16 +192,17 @@ def calc_control_points_with_poses(curr, path):
     point4 = point5 - (1 / 5) * v1
     point3 = (1 / 20) * acc1 + 2 * point4 - point5
 
-    return point0, point1, point2, point3, point4, point5
+    #Return Quintic Bezier for current point
+    return Quintic_bezier(point0, point1, point2, point3, point4, point5)
 
 
-def calc_control_points_with_points(curr, path, initial_heading, final_heading):
+def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, tangent_magnitude):
     """Calculates control points of quintic bezier curve if given an arbitrary number of points and
     initial/final heading. """
 
     if curr == 0:
         if len(path) == 2:
-            magnitudev0 = (1 / 2) * magnitude(path[curr + 1] - path[curr])
+            magnitudev0 = tangent_magnitude * magnitude(path[curr + 1] - path[curr])
 
             v0 = Point(math.sin(initial_heading), math.cos(initial_heading)) * magnitudev0
 
@@ -157,17 +210,27 @@ def calc_control_points_with_points(curr, path, initial_heading, final_heading):
             # to straight line connection from previous point
 
             if final_heading is None:
-                v1 = (path[curr + 1] - path[curr]) / (magnitude(path[curr + 1] - path[curr])) * magnitudev0
+                v1 = ((path[curr + 1] - path[curr]) / (magnitude(path[curr + 1] - path[curr]))) * magnitudev0
             else:
-                v0 = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudev0
-
+                v1 = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudev0
 
             acc0 = -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1]
             acc1 = 6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]
         else:
-            magnitudev0 = (1 / 2) * magnitude(path[curr + 1] - path[curr])
 
-            magnitudev1 = (1 / 2) * min(magnitude(path[curr + 1] - path[curr]),
+            if curr + 2 == len(path) - 1:
+                magnitudevD = tangent_magnitude * magnitude(path[curr + 2] - path[curr + 1])
+                if final_heading is None:
+                    vD = (path[curr + 2] - path[curr + 1]) / (magnitude(path[curr + 2] - path[curr + 1])) * magnitudevD
+                else:
+                    vD = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudevD
+            else:
+                magnitudevD = tangent_magnitude * min(magnitude(path[curr + 2] - path[curr + 1]),
+                                                      magnitude(path[curr + 3] - path[curr + 2]))
+                vD = getPerpendicularVector(path[curr + 1], path[curr + 2], path[curr + 3]) * magnitudevD
+
+            magnitudev0 = tangent_magnitude * magnitude(path[curr + 1] - path[curr])
+            magnitudev1 = tangent_magnitude * min(magnitude(path[curr + 1] - path[curr]),
                                         magnitude(path[curr + 2] - path[curr + 1]))
 
             v0 = Point(math.sin(initial_heading), math.cos(initial_heading)) * magnitudev0
@@ -182,11 +245,20 @@ def calc_control_points_with_points(curr, path, initial_heading, final_heading):
 
             acc0 = -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1]
             acc1 = alpha * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta * (
-                        -6 * path[curr + 1] - 4 * v0 - 2 * v1 + 6 * path[curr + 2])
+                    -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
 
     elif curr == len(path) - 2:
-        magnitudev0 = (1 / 2) * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
-        magnitudev1 = (1 / 2) * magnitude(path[curr] - path[curr - 1])
+        if curr - 1 == 0:
+            magnitudevA = tangent_magnitude * magnitude(path[curr] - path[curr-1])
+            vA = Point(math.sin(initial_heading), math.cos(initial_heading)) * magnitudevA
+        else:
+
+            magnitudevA = tangent_magnitude * min(magnitude(path[curr-2] - path[curr - 1]), magnitude(path[curr] - path[curr - 1]))
+            vA = getPerpendicularVector(path[curr-2], path[curr - 1], path[curr]) * magnitudevA
+
+
+        magnitudev0 = tangent_magnitude * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
+        magnitudev1 = tangent_magnitude * magnitude(path[curr+1] - path[curr])
 
         v0 = getPerpendicularVector(path[curr - 1], path[curr], path[curr + 1]) * magnitudev0
         if final_heading is None:
@@ -198,14 +270,32 @@ def calc_control_points_with_points(curr, path, initial_heading, final_heading):
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
         beta = (magnitude(path[curr] - path[curr - 1])) / (
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
-
-        acc0 = alpha * (6 * path[curr - 1] + 2 * v0 + 4 * v1 - 6 * path[curr]) + beta * (
+        acc0 = alpha * (6 * path[curr - 1] + 2 * vA + 4 * v0 - 6 * path[curr]) + beta * (
                     -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1])
         acc1 = 6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]
 
     else:
-        magnitudev0 = (1 / 2) * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
-        magnitudev1 = (1 / 2) * min(magnitude(path[curr + 1] - path[curr]), magnitude(path[curr + 2] - path[curr + 1]))
+
+        if curr - 1 == 0:
+            magnitudevA = tangent_magnitude * magnitude(path[curr] - path[curr-1])
+            vA = Point(math.sin(initial_heading), math.cos(initial_heading)) * magnitudevA
+        else:
+            magnitudevA = tangent_magnitude * min(magnitude(path[curr-2] - path[curr - 1]), magnitude(path[curr] - path[curr - 1]))
+            vA = getPerpendicularVector(path[curr-2], path[curr - 1], path[curr]) * magnitudevA
+
+        # If two points ahead is last point on path
+        if curr + 2 == len(path) - 1:
+            magnitudevD = tangent_magnitude * magnitude(path[curr + 2] - path[curr + 1])
+            if final_heading is None:
+                vD = (path[curr + 2] - path[curr+1]) / (magnitude(path[curr + 2] - path[curr+1])) * magnitudevD
+            else:
+                vD = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudevD
+        else:
+            magnitudevD = tangent_magnitude * min(magnitude(path[curr + 2] - path[curr + 1]), magnitude(path[curr + 3] - path[curr + 2]))
+            vD = getPerpendicularVector(path[curr + 1], path[curr + 2], path[curr + 3]) * magnitudevD
+
+        magnitudev0 = tangent_magnitude * min(magnitude(path[curr] - path[curr - 1]), magnitude(path[curr + 1] - path[curr]))
+        magnitudev1 = tangent_magnitude * min(magnitude(path[curr + 1] - path[curr]), magnitude(path[curr + 2] - path[curr + 1]))
 
         v0 = getPerpendicularVector(path[curr - 1], path[curr], path[curr + 1]) * magnitudev0
         v1 = getPerpendicularVector(path[curr], path[curr + 1], path[curr + 2]) * magnitudev1
@@ -214,15 +304,17 @@ def calc_control_points_with_points(curr, path, initial_heading, final_heading):
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
         beta0 = (magnitude(path[curr] - path[curr - 1])) / (
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
+
         alpha1 = (magnitude(path[curr + 2] - path[curr + 1])) / (
                     magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
         beta1 = (magnitude(path[curr + 1] - path[curr])) / (
                     magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
 
-        acc0 = alpha0 * (6 * path[curr - 1] + 2 * v0 + 4 * v1 - 6 * path[curr]) + beta0 * (
+        acc0 = alpha0 * (6 * path[curr - 1] + 2 * vA + 4 * v0 - 6 * path[curr]) + beta0 * (
                     -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1])
         acc1 = alpha1 * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta1 * (
-                    -6 * path[curr + 1] - 4 * v0 - 2 * v1 + 6 * path[curr + 2])
+                    -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
+
 
     point0 = path[curr]
     point5 = path[curr + 1]
@@ -231,15 +323,7 @@ def calc_control_points_with_points(curr, path, initial_heading, final_heading):
     point4 = point5 - (1 / 5) * v1
     point3 = (1 / 20) * acc1 + 2 * point4 - point5
 
-    return point0, point1, point2, point3, point4, point5
-
-
-def quintic_bezier(point0, point1, point2, point3, point4, point5, t):
-    """Returns point in quintic bezier curve. """
-    p = ((1 - t) ** 5) * point0 + (5 * ((1 - t) ** 4) * t * point1) + (10 * ((1 - t) ** 3) * (t ** 2) * point2) + (
-                10 * ((1 - t) ** 2) * (t ** 3) * point3 + 5 * (1 - t) * (t ** 4) * point4) + ((t ** 5) * point5)
-
-    return p
+    return Quintic_bezier(point0, point1, point2, point3, point4, point5)
 
 def lerp(point0, point1, t):
 

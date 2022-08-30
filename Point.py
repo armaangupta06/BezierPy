@@ -41,12 +41,16 @@ def magnitude(p):
     """Returns magnitude of a vector"""
     return math.sqrt(p.x**2 + p.y**2)
 
+def determinant(v1, v2):
+    """Returns determinant of 2D matrix with two vectors"""
+    return v1.x * v2.y - v2.x * v1.y
+
 def slope(p1, p2):
     p = p2 - p1
     return (p.y/p.x)
 
 def getPerpendicularVector(A, B, C):
-    """Returns vector peperndicular to the angle bisector of the angle inscribed between neighboring points."""
+    """Returns vector perpendicular to the angle bisector of the angle inscribed between neighboring points."""
 
     AB = B-A
     BC = C-B
