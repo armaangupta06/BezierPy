@@ -1,7 +1,6 @@
 import pygame
 import curve
 from Pose import Pose
-from Point import *
 
 def clicked_point(click_pos, poses):
     for pose in poses:
@@ -54,7 +53,7 @@ selectedPoint = None
 
 poses = []
 
-path, _ = curve.path_with_poses(*poses)
+path = curve.path_with_poses(*poses)
 
 fontSize = 18
 font = pygame.font.SysFont("comicsans", fontSize)
@@ -84,7 +83,7 @@ while running:
 
                 newPose = Pose(pointPos[0], pointPos[1], headingInput)
                 poses.append(newPose)
-                path, _ = curve.path_with_poses(*poses)
+                path = curve.path_with_poses(*poses)
 
                 headingInput = 0
 
@@ -97,7 +96,7 @@ while running:
             newPos = pixels_to_coord(event.pos)
             selectedPoint.x = newPos[0]
             selectedPoint.y = newPos[1]
-            path, _ = curve.path_with_poses(*poses)
+            path = curve.path_with_poses(*poses)
             editingPoint = False
 
         elif event.type == pygame.MOUSEBUTTONDOWN:

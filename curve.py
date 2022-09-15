@@ -1,36 +1,36 @@
 import numpy as np
 from Pose import *
 import matplotlib.pyplot as plt
-from Quintic_bezier import Quintic_bezier
+from Quintic_Bezier import Quintic_Bezier
+from Path_Point import *
 
 def graph_path(data):
     """Graphs points of path using matplotlib"""
 
-    fig, axis = plt.subplots(2)
+    fig, axis = plt.subplots(3)
 
-    for P in data[0]:
-        axis[0].scatter(P.x, P.y, color="black")
+    for point in data:
+        axis[0].scatter(point.x, point.y, color="black")
 
-    axis[0].set_xlim([-0.25, 4])
-    axis[0].set_ylim([0, 4])
     axis[0].set_title("Points")
 
-    for C in range(len(data[1])):
+    for t in range(len(data)):
         # print(C, data[1][C])
-        axis[1].scatter(C, data[1][C], color="black")
+        axis[1].scatter(t, data[t].curvature, color="black")
+        axis[2].scatter(t, data[t].velocity, color="black")
 
-    axis[1].set_xlim([0, 200])
-    axis[1].set_ylim([-10, 8])
+
     axis[1].set_title("Curvature")
+    axis[2].set_title("Velocity")
+    axis[2].set_ylim([0, 115])
     plt.show()
 
 
-def path_with_points(*points, initial_heading, final_heading=None, tangent_magnitude = 1/2):
+def path_with_points(*points, initial_heading, final_heading=None, v = 100, a = 10, tangent_magnitude = 1/2):
     """Spline interpolation between waypoints using an arbitrary number of waypoints and initial/final heading."""
 
     # List which holds discrete points from the quintic beziér curves
     path = []
-    curvature = []
 
     # Converts initial and final heading to radians from degrees
     initial_heading *= (math.pi / 180)
@@ -45,19 +45,16 @@ def path_with_points(*points, initial_heading, final_heading=None, tangent_magni
         for t in np.arange(0, 1.01, 0.01):
             p = curve.get_point(t)
             w = curve.calc_curvature(t)
-            path.append(p)
-            curvature.append(w)
+            path.append(Path_Point(curve.get_point(t), curve.calc_curvature(t)))
 
+    path = calc_velocity(path, v, a)
+    return path
 
-    return path, curvature
-
-
-def path_with_poses(*poses, tangent_magnitude = 1/2):
+def path_with_poses(*poses, v = 100, a = 10, tangent_magnitude = 1/2):
     """Spline interpolation between waypoints using an arbitrary number of poses."""
 
     # List which holds discrete points from quintic beziér curves
     path = []
-    curvature = []
 
     # Iterates through waypoints and creates path
     for curr in range(len(poses) - 1):
@@ -65,10 +62,29 @@ def path_with_poses(*poses, tangent_magnitude = 1/2):
         for t in np.arange(0, 1, 0.01):
             p = curve.get_point(t)
             w = curve.calc_curvature(t)
-            path.append(p)
-            curvature.append(w)
+            path.append(Path_Point(curve.get_point(t), curve.calc_curvature(t)))
 
-    return path, curvature
+    path = calc_velocity(path, v, a)
+    return path
+
+
+def calc_velocity(path, v, a):
+    """Calculates velocity profile of path with max velocity and max acceleration."""
+    if len(path) == 0:
+        return path
+    path[-1].velocity = 0
+    for i in range(len(path)-2, -1, -1):
+        if path[i].curvature == 0:
+            curv = 0.001
+        else:
+            curv = path[i].curvature
+        desired_velocity = min(v, 3.0/abs(curv))
+        distance = distance_formula(path[i+1], path[i])
+        limited_velocity = math.sqrt(path[i+1].velocity ** 2 + 2 * a * distance)
+
+        path[i].velocity = min(desired_velocity, limited_velocity)
+
+    return path
 
 
 def calc_bezier_curve_with_poses(curr, path, tangent_magnitude):
@@ -193,7 +209,7 @@ def calc_bezier_curve_with_poses(curr, path, tangent_magnitude):
     point3 = (1 / 20) * acc1 + 2 * point4 - point5
 
     #Return Quintic Bezier for current point
-    return Quintic_bezier(point0, point1, point2, point3, point4, point5)
+    return Quintic_Bezier(point0, point1, point2, point3, point4, point5)
 
 
 def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, tangent_magnitude):
@@ -323,7 +339,7 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
     point4 = point5 - (1 / 5) * v1
     point3 = (1 / 20) * acc1 + 2 * point4 - point5
 
-    return Quintic_bezier(point0, point1, point2, point3, point4, point5)
+    return Quintic_Bezier(point0, point1, point2, point3, point4, point5)
 
 def lerp(point0, point1, t):
 

@@ -1,6 +1,6 @@
 from Point import *
 
-class Quintic_bezier:
+class Quintic_Bezier:
     def __init__(self, point0, point1, point2, point3, point4, point5):
         self.point0 = point0
         self.point1 = point1
