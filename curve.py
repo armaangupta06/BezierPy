@@ -1,28 +1,84 @@
 import numpy as np
-from Pose import *
 import matplotlib.pyplot as plt
 from Quintic_Bezier import Quintic_Bezier
 from Path_Point import *
+
+def generate_points(path):
+    """Generates points from list of Quintic Beziér objects."""
+    points = []
+    for curve in path:
+        for t in np.arange(0, 1.01, 0.01):
+            # Calculate first derivative vector at point
+            dydx = curve.calc_first_derivative(t)
+
+            #Calculate direction of vector.
+            theta = math.atan2(dydx.x, dydx.y) * (180 / math.pi)
+
+            velocity = magnitude(curve.calc_first_derivative(t))
+            points.append(Path_Point(curve.get_point(t), curve.calc_curvature(t), velocity = velocity, theta = theta))
+
+    return points
+def calculate_trajectory(path, max_v, max_w, max_a):
+    steps = []
+    arcLength = 0
+    s = 0.01
+    last_velocity = 0
+
+    # Calculate cumulative arclength
+    for curve in path:
+        arcLength += curve.calc_arc_length()
+
+    for curve in path:
+        dt = 0.01
+        t = 0
+
+        while t < 1.0 and s < arcLength:
+            # Calculates current curvature, velocity, and point with last value of t.
+            curvature = curve.calc_curvature(t)
+            max_reachable_velocity = (max_v * max_w)/(math.fabs(curvature) * max_v + max_w)
+            velocity = min(trapezoidal_motion_profile(s, arcLength, max_v, max_a), max_reachable_velocity)
+
+            if last_velocity == 0:
+                acceleration = velocity/dt
+            else:
+                acceleration = (velocity ** 2 - last_velocity ** 2)/(2 * last_velocity * dt)
+
+            pose = curve.get_point(t)
+            w = curvature * velocity
+
+            # Increase arc length by integrating velocity at timestep.
+            deltaS = velocity * dt
+            s += deltaS
+
+            # Increase t by dividing change in distance in arc length by magnitude of velocity vector.
+            magnitude_velocity = magnitude(curve.calc_first_derivative(t))
+
+            delta_t = deltaS/magnitude_velocity
+            t += delta_t
+
+            last_velocity = velocity
+
+            # Append PathPoint to path
+            steps.append(Path_Point(pose, curvature = curvature, velocity=velocity));
+
+    return steps
 
 def graph_path(data):
     """Graphs points of path using matplotlib"""
 
     fig, axis = plt.subplots(3)
 
-    for point in data:
-        axis[0].scatter(point.x, point.y, color="black")
-
+    #Plot points in data.
+    axis[0].plot([point.x for point in data], [point.y for point in data])
     axis[0].set_title("Points")
 
-    for t in range(len(data)):
-        # print(C, data[1][C])
-        axis[1].scatter(t, data[t].curvature, color="black")
-        axis[2].scatter(t, data[t].velocity, color="black")
+    #Plot velocity/curvature in data.
+    axis[1].plot([t for t in range(len(data))], [data[t].velocity for t in range(len(data))])
+    axis[2].plot([t for t in range(len(data))], [data[t].curvature for t in range(len(data))])
 
-
-    axis[1].set_title("Curvature")
-    axis[2].set_title("Velocity")
-    axis[2].set_ylim([0, 115])
+    #Set titles of subplots.
+    axis[1].set_title("Velocity")
+    axis[2].set_title("Curvature")
     plt.show()
 
 
@@ -40,14 +96,8 @@ def path_with_points(*points, initial_heading, final_heading=None, v = 100, a = 
     # Iterates through waypoints and creates path
     for curr in range(len(points) - 1):
         curve = calc_bezier_curve_with_points(curr, points, initial_heading, final_heading, tangent_magnitude)
+        path.append(curve)
 
-        # Change increment to change number of discrete points per curve
-        for t in np.arange(0, 1.01, 0.01):
-            p = curve.get_point(t)
-            w = curve.calc_curvature(t)
-            path.append(Path_Point(curve.get_point(t), curve.calc_curvature(t)))
-
-    path = calc_velocity(path, v, a)
     return path
 
 def path_with_poses(*poses, v = 100, a = 10, tangent_magnitude = 1/2):
@@ -59,13 +109,33 @@ def path_with_poses(*poses, v = 100, a = 10, tangent_magnitude = 1/2):
     # Iterates through waypoints and creates path
     for curr in range(len(poses) - 1):
         curve = calc_bezier_curve_with_poses(curr, poses, tangent_magnitude=tangent_magnitude)
-        for t in np.arange(0, 1, 0.01):
-            p = curve.get_point(t)
-            w = curve.calc_curvature(t)
-            path.append(Path_Point(curve.get_point(t), curve.calc_curvature(t)))
+        path.append(curve)
 
-    path = calc_velocity(path, v, a)
     return path
+
+def trapezoidal_motion_profile(distance, totalDist, maxVelocity, maxAcceleration):
+
+    # Initializes variables 'plateauDist' and 'distToAccel'
+    plateauDist = totalDist - (maxVelocity * maxVelocity) / maxAcceleration
+    distToAccel = (totalDist - plateauDist) / 2
+
+    # Case where distance is too short for robot to reach 'maxVelocity'
+    if totalDist <= 2 * distToAccel:
+        plateauDist = 0
+        distToAccel = totalDist / 2
+
+        # recalculates 'maxVelocity' to appropriate value
+        maxVelocity = math.sqrt(2 * maxAcceleration * distToAccel)
+
+    if distance < distToAccel:
+
+        velocity = math.sqrt(2 * maxAcceleration * distance)
+    elif distance < (plateauDist + distToAccel):
+        velocity = maxVelocity
+    else:
+        velocity = math.sqrt(maxVelocity * maxVelocity - 2 * maxAcceleration * (distance - (distToAccel + plateauDist)))
+
+    return velocity
 
 
 def calc_velocity(path, v, a):
@@ -232,6 +302,7 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
 
             acc0 = -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1]
             acc1 = 6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]
+
         else:
 
             if curr + 2 == len(path) - 1:
@@ -258,7 +329,6 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
                         magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
             beta = (magnitude(path[curr + 1] - path[curr])) / (
                         magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
-
             acc0 = -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1]
             acc1 = alpha * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta * (
                     -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
@@ -280,7 +350,7 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
         if final_heading is None:
             v1 = (path[curr + 1] - path[curr]) / (magnitude(path[curr + 1] - path[curr])) * magnitudev1
         else:
-            v1 = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudev0
+            v1 = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudev1
 
         alpha = (magnitude(path[curr + 1] - path[curr])) / (
                     magnitude(path[curr] - path[curr - 1]) + magnitude(path[curr + 1] - path[curr]))
@@ -291,7 +361,6 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
         acc1 = 6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]
 
     else:
-
         if curr - 1 == 0:
             magnitudevA = tangent_magnitude * magnitude(path[curr] - path[curr-1])
             vA = Point(math.sin(initial_heading), math.cos(initial_heading)) * magnitudevA
@@ -306,6 +375,7 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
                 vD = (path[curr + 2] - path[curr+1]) / (magnitude(path[curr + 2] - path[curr+1])) * magnitudevD
             else:
                 vD = Point(math.sin(final_heading), math.cos(final_heading)) * magnitudevD
+
         else:
             magnitudevD = tangent_magnitude * min(magnitude(path[curr + 2] - path[curr + 1]), magnitude(path[curr + 3] - path[curr + 2]))
             vD = getPerpendicularVector(path[curr + 1], path[curr + 2], path[curr + 3]) * magnitudevD
@@ -326,11 +396,11 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
         beta1 = (magnitude(path[curr + 1] - path[curr])) / (
                     magnitude(path[curr + 1] - path[curr]) + magnitude(path[curr + 2] - path[curr + 1]))
 
+
         acc0 = alpha0 * (6 * path[curr - 1] + 2 * vA + 4 * v0 - 6 * path[curr]) + beta0 * (
                     -6 * path[curr] - 4 * v0 - 2 * v1 + 6 * path[curr + 1])
         acc1 = alpha1 * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta1 * (
                     -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
-
 
     point0 = path[curr]
     point5 = path[curr + 1]
@@ -340,6 +410,7 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
     point3 = (1 / 20) * acc1 + 2 * point4 - point5
 
     return Quintic_Bezier(point0, point1, point2, point3, point4, point5)
+
 
 def lerp(point0, point1, t):
 

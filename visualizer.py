@@ -29,38 +29,96 @@ pygame.init()
 SCREEN_SIZE = (800, 800)
 screen = pygame.display.set_mode(SCREEN_SIZE)
 
-POINT_RADIUS = 10
 
-# VEX field height and width in inches
-VEX_FIELD_SIZE = 12
-# ratio of pixels to inches
+
+# VEX field height and width in inches.
+VEX_FIELD_SIZE = 144
+
+# Ratio of pixels to inches.
 INCH_TO_PIXEL = SCREEN_SIZE[0] / VEX_FIELD_SIZE
+
+#Default tangent magnitude value.
+magnitude = 0.8
+
+#Radius of point in visualizer in inches.
+POINT_RADIUS = 14.5/2 * (INCH_TO_PIXEL)
+
 
 clock = pygame.time.Clock()
 pygame.display.set_caption("Path Visualizer")
-
 fieldImg = pygame.transform.scale(pygame.image.load("./Images/game_field_cropped.png"), SCREEN_SIZE)
 
 running = True
-
+changingMagnitude = False
 addingPoint = False
 headingInput = 0
+magnitudeInput = 0
 pointPos = (0, 0)
 inputNegative = False
+inputDecimal = False
+decimalPlaces = 0
 
 editingPoint = False
 selectedPoint = None
 
 poses = []
-
 path = curve.path_with_poses(*poses)
 
 fontSize = 18
 font = pygame.font.SysFont("comicsans", fontSize)
 pointSurface = None
+magnitudeSurface = None
 
 while running:
     for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_m and not addingPoint:
+            changingMagnitude = True
+            print(changingMagnitude)
+
+        if changingMagnitude and event.type == pygame.KEYDOWN:
+            if pygame.K_0 <= event.key <= pygame.K_9:
+                numInput = event.key - pygame.K_0
+                if inputDecimal:
+                    magnitudeInput += numInput / (10.0 ** decimalPlaces)
+                    decimalPlaces += 1
+                else:
+                    magnitudeInput = (abs(magnitudeInput) * 10 + numInput) * (1 - 2 * inputNegative)
+
+            if event.key == pygame.K_BACKSPACE:
+                magnitudeInput = abs(magnitudeInput)
+                if inputDecimal:
+                    magnitudeInput = abs(magnitudeInput)
+                    magnitudeInput *= (10.0 ** (decimalPlaces-1))
+                    magnitudeInput = int((magnitudeInput - (magnitudeInput % 10)) / 10)
+                    magnitudeInput *= (1 - 2 * inputNegative)
+                    decimalPlaces -= 1
+                    magnitudeInput /= (10.0 ** (decimalPlaces-1))
+
+                    if decimalPlaces == 0:
+                        inputDecimal = False
+                else:
+                    magnitudeInput = int((magnitudeInput - (magnitudeInput % 10)) / 10)
+                    magnitudeInput *= (1 - 2 * inputNegative)
+
+            if event.key == pygame.K_MINUS:
+                inputNegative = not inputNegative
+                magnitudeInput = -magnitudeInput
+                inputDecimal = False
+
+            if event.key == pygame.K_PERIOD:
+                inputDecimal = True
+                decimalPlaces = 1
+
+            if event.key == pygame.K_RETURN:
+                changingMagnitude = False
+                inputDecimal = False
+                inputNegative = False
+                magnitude = magnitudeInput
+                path = curve.generate_points(curve.path_with_poses(*poses, tangent_magnitude=magnitude))
+                draw_lines(path)
+
+                magnitudeInput = 0
+
         if addingPoint and event.type == pygame.KEYDOWN:
             # if key is a number key
             if pygame.K_0 <= event.key <= pygame.K_9:
@@ -83,7 +141,7 @@ while running:
 
                 newPose = Pose(pointPos[0], pointPos[1], headingInput)
                 poses.append(newPose)
-                path = curve.path_with_poses(*poses)
+                path = curve.generate_points(curve.path_with_poses(*poses, tangent_magnitude=magnitude))
 
                 headingInput = 0
 
@@ -96,7 +154,7 @@ while running:
             newPos = pixels_to_coord(event.pos)
             selectedPoint.x = newPos[0]
             selectedPoint.y = newPos[1]
-            path = curve.path_with_poses(*poses)
+            path = curve.generate_points(curve.path_with_poses(*poses, tangent_magnitude=magnitude))
             editingPoint = False
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -104,13 +162,14 @@ while running:
             if (selectedPoint != False):
                 pointSurface = font.render(f"Moving Point @ ({round(selectedPoint.x, 2)}, {round(selectedPoint.y, 2)})", True, (255, 255, 255), (0, 0, 0))
                 editingPoint = True
+                changingMagnitude = False
             else:
                 pointPos = pixels_to_coord(event.pos)
                 pointSurface = font.render(f"Point ({round(pointPos[0], 2)}, {round(pointPos[1], 2)})", True, (255, 255, 255), (0, 0, 0))
                 addingPoint = True
+                changingMagnitude = False
         if event.type == pygame.QUIT:
             running = False
-    
 
     screen.blit(fieldImg, (0, 0))
 
@@ -123,6 +182,10 @@ while running:
         textSurface = font.render(f"Heading: {headingInput}", True, (255, 255, 255), (0, 0, 0))
         screen.blit(pointSurface, (0, 0))
         screen.blit(textSurface, (0, pointSurface.get_rect()[3]))
+
+    if changingMagnitude:
+        textSurface = font.render(f"Tangent Magnitude: {magnitudeInput}", True, (255, 255, 255), (0, 0, 0))
+        screen.blit(textSurface, (0, 0))
 
     if editingPoint:
         draw_points([selectedPoint], (255, 255, 0))

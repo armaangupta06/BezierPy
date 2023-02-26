@@ -1,5 +1,6 @@
 from Point import *
 
+import numpy as np
 class Quintic_Bezier:
     def __init__(self, point0, point1, point2, point3, point4, point5):
         self.point0 = point0
@@ -20,12 +21,13 @@ class Quintic_Bezier:
         return p
 
     def calc_second_derivative(self, t):
-        p = ((20 * ((1 - t) ** 3) * (self.point2 - 2 * self.point1 + self.point0)) +
-             (60 * t * ((1 - t) ** 2) * (self.point3 - 2 * self.point2 + self.point1)) +
-             (60 * (t ** 2) * (1 - t) * (self.point4 - 2 * self.point3 + self.point2) +
-              (20 * (t ** 3) * (self.point5 - 2 * self.point4 + self.point3))))
+        p = ((20 * ((1 - t) ** 3) * (self.point2 - (2 * self.point1) + self.point0)) +
+             (60 * t * ((1 - t) ** 2) * (self.point3 - (2 * self.point2) + self.point1)) +
+             (60 * (t ** 2) * (1 - t) * (self.point4 - (2 * self.point3) + self.point2) +
+              (20 * (t ** 3) * (self.point5 - (2 * self.point4) + self.point3))))
 
         return p
+
 
     def calc_curvature(self, t):
         # print("d", (determinant(self.calc_first_derivative(t), self.calc_second_derivative(t))))
@@ -39,4 +41,13 @@ class Quintic_Bezier:
              (10 * ((1 - t) ** 2) * (t ** 3) * self.point3 + 5 * (1 - t) * (t ** 4) * self.point4) + ((t ** 5) * self.point5))
 
         return p
+
+    def calc_arc_length(self):
+        distance = 0
+        prev_point = self.get_point(0);
+        for t in np.arange(0, 1.01, 0.01):
+            curr_point = self.get_point(t)
+            distance += distance_formula(curr_point, prev_point)
+            prev_point = curr_point
+        return distance
 
