@@ -46,7 +46,7 @@ POINT_RADIUS = 14.5/2 * (INCH_TO_PIXEL)
 
 clock = pygame.time.Clock()
 pygame.display.set_caption("Path Visualizer")
-fieldImg = pygame.transform.scale(pygame.image.load("./Images/game_field_cropped.png"), SCREEN_SIZE)
+fieldImg = pygame.transform.scale(pygame.image.load("./Images/over_under_game_field.png"), SCREEN_SIZE)
 
 running = True
 changingMagnitude = False
