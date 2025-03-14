@@ -22,7 +22,11 @@ app = FastAPI(
 # This is important for the web-based frontend to communicate with the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify the allowed origins
+    allow_origins=[
+        "*",  # For development
+        "https://bezier-py.vercel.app",  # Main Vercel domain
+        "https://*.vercel.app",  # All Vercel preview domains
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

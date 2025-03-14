@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// API base URL - should match the backend URL
-const API_URL = 'http://127.0.0.1:8000';
+// API base URL - use environment variable or fallback to local development URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 // Create axios instance with base URL
 const api = axios.create({
