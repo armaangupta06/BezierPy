@@ -1,27 +1,7 @@
 import axios from 'axios';
 
-// Determine if we're running on the client or server side
-const isClient = typeof window !== 'undefined';
-
-// Determine the base URL based on environment
-let API_URL = '';
-
-// In production (Vercel deployment)
-if (process.env.NODE_ENV === 'production') {
-  // Use the Render backend URL in production
-  // Replace 'bezier-py-api' with your actual Render service name
-  API_URL = 'https://bezier-py-api.onrender.com';
-} else {
-  // In development, use the local API server
-  API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-}
-
-console.log('API URL:', API_URL);
-
-// No need for path modification since we're using a separate backend
-const getPath = (path: string): string => {
-  return path;
-};
+// API base URL - should match the backend URL
+const API_URL = 'http://127.0.0.1:8000';
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -100,49 +80,42 @@ export interface TrajectoryResponse {
 export const apiService = {
   // Path endpoints
   createPathFromPoints: async (data: CreatePathFromPointsRequest): Promise<PathResponse> => {
-    console.log('Creating path from points with URL:', getPath('/paths/from-points'));
-    const response = await api.post(getPath('/paths/from-points'), data);
+    const response = await api.post('/paths/from-points', data);
     return response.data;
   },
 
   createPathFromPoses: async (data: CreatePathFromPosesRequest): Promise<PathResponse> => {
-    console.log('Creating path from poses with URL:', getPath('/paths/from-poses'));
-    const response = await api.post(getPath('/paths/from-poses'), data);
+    const response = await api.post('/paths/from-poses', data);
     return response.data;
   },
   
   createPathFromControlPoints: async (data: CreatePathFromControlPointsRequest): Promise<PathResponse> => {
-    console.log('Creating path from control points with URL:', getPath('/paths/from-control-points'));
-    const response = await api.post(getPath('/paths/from-control-points'), data);
+    const response = await api.post('/paths/from-control-points', data);
     return response.data;
   },
 
   getPath: async (pathId: string, includeDiscretized: boolean = false): Promise<PathResponse> => {
-    const url = getPath(`/paths/${pathId}?include_discretized=${includeDiscretized}`);
-    console.log('Getting path with URL:', url);
-    const response = await api.get(url);
+    const response = await api.get(`/paths/${pathId}?include_discretized=${includeDiscretized}`);
     return response.data;
   },
 
   deletePath: async (pathId: string): Promise<void> => {
-    await api.delete(getPath(`/paths/${pathId}`));
+    await api.delete(`/paths/${pathId}`);
   },
 
   // Trajectory endpoints
   generateTrajectory: async (pathId: string, params: TrajectoryParamsModel): Promise<TrajectoryResponse> => {
-    const url = getPath(`/trajectories/from-path/${pathId}`);
-    console.log('Generating trajectory with URL:', url);
-    const response = await api.post(url, params);
+    const response = await api.post(`/trajectories/from-path/${pathId}`, params);
     return response.data;
   },
 
   getTrajectory: async (trajectoryId: string): Promise<TrajectoryResponse> => {
-    const response = await api.get(getPath(`/trajectories/${trajectoryId}`));
+    const response = await api.get(`/trajectories/${trajectoryId}`);
     return response.data;
   },
 
   deleteTrajectory: async (trajectoryId: string): Promise<void> => {
-    await api.delete(getPath(`/trajectories/${trajectoryId}`));
+    await api.delete(`/trajectories/${trajectoryId}`);
   },
 };
 

@@ -7,15 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
-# Import routes - use relative imports when deployed
-try:
-    # Try relative imports first (for deployment)
-    from routes.path_routes import router as path_router
-    from routes.trajectory_routes import router as trajectory_router
-except ImportError:
-    # Fall back to absolute imports (for local development)
-    from api.routes.path_routes import router as path_router
-    from api.routes.trajectory_routes import router as trajectory_router
+# Import routes
+from api.routes.path_routes import router as path_router
+from api.routes.trajectory_routes import router as trajectory_router
 
 # Create FastAPI application
 app = FastAPI(
@@ -26,17 +20,15 @@ app = FastAPI(
 
 # Add CORS middleware to allow cross-origin requests
 # This is important for the web-based frontend to communicate with the API
+import os
+
+# Get allowed origins from environment variable or use default
+allow_origins = os.getenv("ALLOW_ORIGINS", "http://localhost:3000").split(",")
+print(f"Allowing CORS for origins: {allow_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*",  # For development
-        "http://localhost",
-        "http://localhost:3000",
-        "https://bezier-py.vercel.app",  # Main frontend Vercel domain
-        "https://*.vercel.app",  # All Vercel preview domains
-        "https://*.now.sh",  # Legacy Vercel domains
-        "https://*.onrender.com",  # Render domains
-    ],
+    allow_origins=allow_origins,  # Use environment variable in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
