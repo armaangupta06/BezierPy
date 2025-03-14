@@ -35,6 +35,10 @@ class Point:
 
     def __str__(self):
         return "({0},{1})".format(self.x, self.y)
+        
+    def __round__(self, ndigits=0):
+        """Round the coordinates to the given number of digits"""
+        return Point(round(self.x, ndigits), round(self.y, ndigits))
 
 def distance_formula(p1, p2):
     """Returns distance between two points"""

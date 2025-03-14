@@ -18,13 +18,22 @@ def generate_points(path):
             points.append(Path_Point(curve.get_point(t), curve.calc_curvature(t), velocity = velocity, theta = theta))
 
     return points
-def calculate_trajectory(path, max_v, max_w, max_a, max_j=0, trap=True):
+# def model_predictive_control(path, max_v, max_w, max_a, max_j=0, trap=True):
+#     control = []
+#     while True:
+#         t = calculate_trajectory(path, max_v, max_w, max_a, max_j=0, trap=True)
+#         first_control =  t[0]
+#
+#         control.append(first_control)
+
+def calculate_trajectory(path, v0, v1, max_v, a_accel, a_decel, max_j, max_w, trap=True):
     steps = []
     arcLength = 0
     s = 0.01
     last_velocity = 0
     last_curvature = 0
     last_w = 0
+
 
     # Calculate cumulative arclength
     for curve in path:
@@ -38,32 +47,40 @@ def calculate_trajectory(path, max_v, max_w, max_a, max_j=0, trap=True):
 
             ang_acc = 100
             # Calculates current curvature, velocity, and point with last value of t.
-            curvature = curve.calc_curvature(t)
+            deriv = curve.calc_first_derivative(t)
+            curvature = curve.calc_curvature(t, deriv)
 
             max_reachable_velocity = (max_v * max_w)/(math.fabs(curvature) * max_v + max_w)
             if trap:
-                velocity = min(trapezoidal_motion_profile(s, arcLength, max_v, max_a), max_reachable_velocity)
+                velocity = min(trapezoidal_motion_profile(s, arcLength, v0, v1, max_v, a_accel, a_decel), max_reachable_velocity)
             else:
-                velocity = calculate_s_curve(0, arcLength, 0, 0, max_v, max_a, max_j, s)[0]
+                velocity = calculate_s_curve(0, arcLength, v0, v1, max_v, a_accel, max_j, s)[0]
+
+            # acceleration = (velocity - last_velocity) / dt
+            # if last_velocity == 0:
+            #     acceleration = velocity/dt
+            # else:
+            #     acceleration = (velocity ** 2 - last_velocity ** 2)/(2 * last_velocity * dt)
 
 
-            if last_velocity == 0:
-                acceleration = velocity/dt
-            else:
-                acceleration = (velocity ** 2 - last_velocity ** 2)/(2 * last_velocity * dt)
-
-            print((ang_acc*dt)/curvature + last_velocity)
+            # print((ang_acc*dt)/curvature + last_velocity)
 
             pose = curve.get_point(t)
             w = curvature * velocity
-
+            # 0.0
+            # 0.00894427190999916
+            # 0.0
+            # 0.021255006058700184
+            # 0.0
+            # 0.03706766075263443
 
             # Increase arc length by integrating velocity at timestep.
             deltaS = velocity * dt
+            # print(velocity, last_velocity, acceleration, deltaS)
             s += deltaS
 
             # Increase t by dividing change in distance in arc length by magnitude of velocity vector.
-            magnitude_velocity = magnitude(curve.calc_first_derivative(t))
+            magnitude_velocity = magnitude(deriv)
 
             delta_t = deltaS/magnitude_velocity
             t += delta_t
@@ -83,7 +100,9 @@ def graph_path(data):
     fig, axis = plt.subplots(3)
 
     #Plot points in data.
+
     axis[0].plot([point.x for point in data], [point.y for point in data])
+
     axis[0].set_title("Points")
 
     #Plot velocity/curvature in data.
@@ -133,29 +152,16 @@ def path_with_poses(*poses, v = 100, a = 10, tangent_magnitude = 1/2):
 
     return path
 
-def trapezoidal_motion_profile(distance, totalDist, maxVelocity, maxAcceleration):
+def trapezoidal_motion_profile(distance, total_dist, v0, v1, v_max, a_accel, a_decel):
 
+    cruise_velocity = (math.sqrt((2 * total_dist * a_accel * a_decel + a_decel * v0 * v0 - a_accel * v1 * v1)/(a_decel - a_accel)))
+    cruise_velocity = min(v_max, cruise_velocity)
     # Initializes variables 'plateauDist' and 'distToAccel'
-    plateauDist = totalDist - (maxVelocity * maxVelocity) / maxAcceleration
-    distToAccel = (totalDist - plateauDist) / 2
 
-    # Case where distance is too short for robot to reach 'maxVelocity'
-    if totalDist <= 2 * distToAccel:
-        plateauDist = 0
-        distToAccel = totalDist / 2
+    v_forward = math.sqrt(v0 * v0 + 2*a_accel *distance)
+    v_back = math.sqrt(v1 * v1 - 2 * a_decel * (total_dist-distance))
 
-        # recalculates 'maxVelocity' to appropriate value
-        maxVelocity = math.sqrt(2 * maxAcceleration * distToAccel)
-
-    if distance < distToAccel:
-
-        velocity = math.sqrt(2 * maxAcceleration * distance)
-    elif distance < (plateauDist + distToAccel):
-        velocity = maxVelocity
-    else:
-        velocity = math.sqrt(maxVelocity * maxVelocity - 2 * maxAcceleration * (distance - (distToAccel + plateauDist)))
-
-    return velocity
+    return min(cruise_velocity, v_forward, v_back)
 
 
 def calc_velocity(path, v, a):
@@ -291,6 +297,19 @@ def calc_bezier_curve_with_poses(curr, path, tangent_magnitude):
                     -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
 
     #Calculate control points based on first and second derivative
+    v0 = round(v0, 10)
+    v1 = round(v1, 10)
+    acc0 = round(acc0, 10)
+    acc1 = round(acc1, 10)
+
+
+    print(v0)
+    print(v1)
+    print(acc0)
+    print(acc1)
+
+    print()
+
 
     point0 = path[curr]
     point5 = path[curr + 1]
@@ -425,6 +444,13 @@ def calc_bezier_curve_with_points(curr, path, initial_heading, final_heading, ta
 
     # print(acc0, acc1)
     # print(v0, v1)
+
+    v0 = round(v0, 10)
+    v1 = round(v1, 10)
+    acc0 = round(acc0, 10)
+    acc1 = round(acc1, 10)
+
+
     point0 = path[curr]
     point5 = path[curr + 1]
     point1 = (1 / 5) * v0 + point0
