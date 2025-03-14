@@ -1,7 +1,22 @@
 import axios from 'axios';
 
-// API base URL - use environment variable or fallback to local development URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+// Determine if we're running on the client or server side
+const isClient = typeof window !== 'undefined';
+
+// Determine the base URL based on environment
+let API_URL = '';
+
+// In production (Vercel deployment)
+if (process.env.NODE_ENV === 'production') {
+  // Use relative URLs for API requests in production
+  // This will make requests go to the same domain, where Vercel will route them
+  API_URL = '/api';
+} else {
+  // In development, use the local API server
+  API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+}
+
+console.log('API URL:', API_URL);
 
 // Create axios instance with base URL
 const api = axios.create({

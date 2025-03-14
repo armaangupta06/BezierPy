@@ -5,8 +5,16 @@
   "installCommand": "cd frontend && npm install",
   "rewrites": [
     {
+      "source": "/api/paths/(.*)",
+      "destination": "/api/python/index.py"
+    },
+    {
+      "source": "/api/trajectories/(.*)",
+      "destination": "/api/python/index.py"
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api/python/index.py"
     }
   ]
 }

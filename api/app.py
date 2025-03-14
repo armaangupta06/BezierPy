@@ -24,8 +24,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "*",  # For development
+        "http://localhost",
+        "http://localhost:3000",
         "https://bezier-py.vercel.app",  # Main Vercel domain
         "https://*.vercel.app",  # All Vercel preview domains
+        "https://*.now.sh",  # Legacy Vercel domains
     ],
     allow_credentials=True,
     allow_methods=["*"],
