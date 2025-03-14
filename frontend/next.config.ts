@@ -13,12 +13,15 @@ const nextConfig: NextConfig = {
     // your project has TypeScript errors.
     ignoreBuildErrors: true,
   },
-  // Output static exports for easier deployment
-  output: 'export',
-  // Configure images for static export
+  // Don't use static export for Vercel deployment
+  // output: 'export',
+  // Configure images
   images: {
-    unoptimized: true,
+    domains: ['vercel.app'],
+    unoptimized: process.env.NODE_ENV === 'development',
   },
+  // Ensure compatibility with Vercel deployment
+  distDir: '.next',
 };
 
 export default nextConfig;
