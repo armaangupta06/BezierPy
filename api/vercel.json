@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/python/index.py": {
+    "python/index.py": {
       "runtime": "python3.9",
       "memory": 1024,
       "maxDuration": 10
@@ -8,16 +8,8 @@
   },
   "routes": [
     {
-      "src": "/api/paths/(.*)",
-      "dest": "/api/python/index.py"
-    },
-    {
-      "src": "/api/trajectories/(.*)",
-      "dest": "/api/python/index.py"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/python/index.py"
+      "src": "/(.*)",
+      "dest": "/python/index.py"
     }
   ]
 }

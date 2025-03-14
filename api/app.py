@@ -26,7 +26,7 @@ app.add_middleware(
         "*",  # For development
         "http://localhost",
         "http://localhost:3000",
-        "https://bezier-py.vercel.app",  # Main Vercel domain
+        "https://bezier-py.vercel.app",  # Main frontend Vercel domain
         "https://*.vercel.app",  # All Vercel preview domains
         "https://*.now.sh",  # Legacy Vercel domains
     ],

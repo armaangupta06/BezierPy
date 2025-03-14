@@ -8,9 +8,8 @@ let API_URL = '';
 
 // In production (Vercel deployment)
 if (process.env.NODE_ENV === 'production') {
-  // Use relative URLs for API requests in production
-  // This will make requests go to the same domain, where Vercel will route them
-  API_URL = '';
+  // Use the standalone backend URL in production
+  API_URL = 'https://bezier-py-backend.vercel.app';
 } else {
   // In development, use the local API server
   API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
@@ -18,11 +17,8 @@ if (process.env.NODE_ENV === 'production') {
 
 console.log('API URL:', API_URL);
 
-// Helper function to prepend /api to paths in production
+// No need for path modification since we're using a separate backend
 const getPath = (path: string): string => {
-  if (process.env.NODE_ENV === 'production') {
-    return `/api${path}`;
-  }
   return path;
 };
 
