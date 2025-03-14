@@ -29,6 +29,7 @@ app.add_middleware(
         "https://bezier-py.vercel.app",  # Main frontend Vercel domain
         "https://*.vercel.app",  # All Vercel preview domains
         "https://*.now.sh",  # Legacy Vercel domains
+        "https://*.onrender.com",  # Render domains
     ],
     allow_credentials=True,
     allow_methods=["*"],

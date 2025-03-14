@@ -8,8 +8,9 @@ let API_URL = '';
 
 // In production (Vercel deployment)
 if (process.env.NODE_ENV === 'production') {
-  // Use the standalone backend URL in production
-  API_URL = 'https://bezier-py-backend.vercel.app';
+  // Use the Render backend URL in production
+  // Replace 'bezier-py-api' with your actual Render service name
+  API_URL = 'https://bezier-py-api.onrender.com';
 } else {
   // In development, use the local API server
   API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
