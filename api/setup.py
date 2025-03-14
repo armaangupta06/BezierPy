@@ -1,0 +1,19 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="bezierpy-api",
+    version="1.0.0",
+    packages=find_packages(),
+    install_requires=[
+        "fastapi==0.104.1",
+        "uvicorn==0.23.2",
+        "pydantic==2.4.2",
+        "numpy==1.26.0",
+        "scipy==1.11.3",
+        "python-multipart==0.0.6",
+        "starlette==0.27.0",
+        "typing-extensions==4.8.0",
+        "matplotlib==3.8.0",
+        "pandas==2.1.1",
+    ],
+)

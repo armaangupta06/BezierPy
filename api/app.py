@@ -8,8 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 # Import routes
-from api.routes.path_routes import router as path_router
-from api.routes.trajectory_routes import router as trajectory_router
+try:
+    # First try direct imports (when api is the root directory)
+    from routes.path_routes import router as path_router
+    from routes.trajectory_routes import router as trajectory_router
+except ImportError:
+    # Fall back to absolute imports (for when running from parent directory)
+    from api.routes.path_routes import router as path_router
+    from api.routes.trajectory_routes import router as trajectory_router
 
 # Create FastAPI application
 app = FastAPI(
