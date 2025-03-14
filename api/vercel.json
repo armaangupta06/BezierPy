@@ -1,7 +1,7 @@
 {
   "functions": {
     "python/index.py": {
-      "runtime": "python3.9",
+      "runtime": "vercel-python@3.1.0",
       "memory": 1024,
       "maxDuration": 10
     }
