@@ -8,15 +8,15 @@
   },
   "routes": [
     {
-      "src": "/paths/(.*)",
+      "src": "/api/paths/(.*)",
       "dest": "/api/python/index.py"
     },
     {
-      "src": "/trajectories/(.*)",
+      "src": "/api/trajectories/(.*)",
       "dest": "/api/python/index.py"
     },
     {
-      "src": "/",
+      "src": "/api/(.*)",
       "dest": "/api/python/index.py"
     }
   ]

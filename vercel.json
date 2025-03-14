@@ -4,17 +4,9 @@
   "outputDirectory": "frontend/.next",
   "installCommand": "cd frontend && npm install",
   "rewrites": [
-    {
-      "source": "/api/paths/(.*)",
-      "destination": "/api/python/index.py"
-    },
-    {
-      "source": "/api/trajectories/(.*)",
-      "destination": "/api/python/index.py"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/python/index.py"
+    { 
+      "source": "/api/:path*", 
+      "destination": "/api/python/index.py" 
     }
   ]
 }

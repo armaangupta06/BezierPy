@@ -10,13 +10,21 @@ let API_URL = '';
 if (process.env.NODE_ENV === 'production') {
   // Use relative URLs for API requests in production
   // This will make requests go to the same domain, where Vercel will route them
-  API_URL = '/api';
+  API_URL = '';
 } else {
   // In development, use the local API server
   API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 }
 
 console.log('API URL:', API_URL);
+
+// Helper function to prepend /api to paths in production
+const getPath = (path: string): string => {
+  if (process.env.NODE_ENV === 'production') {
+    return `/api${path}`;
+  }
+  return path;
+};
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -95,42 +103,49 @@ export interface TrajectoryResponse {
 export const apiService = {
   // Path endpoints
   createPathFromPoints: async (data: CreatePathFromPointsRequest): Promise<PathResponse> => {
-    const response = await api.post('/paths/from-points', data);
+    console.log('Creating path from points with URL:', getPath('/paths/from-points'));
+    const response = await api.post(getPath('/paths/from-points'), data);
     return response.data;
   },
 
   createPathFromPoses: async (data: CreatePathFromPosesRequest): Promise<PathResponse> => {
-    const response = await api.post('/paths/from-poses', data);
+    console.log('Creating path from poses with URL:', getPath('/paths/from-poses'));
+    const response = await api.post(getPath('/paths/from-poses'), data);
     return response.data;
   },
   
   createPathFromControlPoints: async (data: CreatePathFromControlPointsRequest): Promise<PathResponse> => {
-    const response = await api.post('/paths/from-control-points', data);
+    console.log('Creating path from control points with URL:', getPath('/paths/from-control-points'));
+    const response = await api.post(getPath('/paths/from-control-points'), data);
     return response.data;
   },
 
   getPath: async (pathId: string, includeDiscretized: boolean = false): Promise<PathResponse> => {
-    const response = await api.get(`/paths/${pathId}?include_discretized=${includeDiscretized}`);
+    const url = getPath(`/paths/${pathId}?include_discretized=${includeDiscretized}`);
+    console.log('Getting path with URL:', url);
+    const response = await api.get(url);
     return response.data;
   },
 
   deletePath: async (pathId: string): Promise<void> => {
-    await api.delete(`/paths/${pathId}`);
+    await api.delete(getPath(`/paths/${pathId}`));
   },
 
   // Trajectory endpoints
   generateTrajectory: async (pathId: string, params: TrajectoryParamsModel): Promise<TrajectoryResponse> => {
-    const response = await api.post(`/trajectories/from-path/${pathId}`, params);
+    const url = getPath(`/trajectories/from-path/${pathId}`);
+    console.log('Generating trajectory with URL:', url);
+    const response = await api.post(url, params);
     return response.data;
   },
 
   getTrajectory: async (trajectoryId: string): Promise<TrajectoryResponse> => {
-    const response = await api.get(`/trajectories/${trajectoryId}`);
+    const response = await api.get(getPath(`/trajectories/${trajectoryId}`));
     return response.data;
   },
 
   deleteTrajectory: async (trajectoryId: string): Promise<void> => {
-    await api.delete(`/trajectories/${trajectoryId}`);
+    await api.delete(getPath(`/trajectories/${trajectoryId}`));
   },
 };
 
