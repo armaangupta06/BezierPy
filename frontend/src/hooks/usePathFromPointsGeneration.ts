@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, QueryClient } from '@tanstack/react-query';
-import apiService, { PointModel, CreatePathFromPointsRequest } from '@/services/api';
+import apiService, { PointModel, CreatePathFromPointsRequest, PathResponse } from '@/services/api';
+import bezierService from '@/services/bezierService';
 
 interface UsePathFromPointsGenerationProps {
   queryClient: QueryClient;
@@ -15,25 +16,23 @@ export default function usePathFromPointsGeneration({
 }: UsePathFromPointsGenerationProps) {
   const [isLoading, setIsLoading] = useState(false);
 
-  const generatePathMutation = useMutation({
-    mutationFn: (data: CreatePathFromPointsRequest) => {
-      return apiService.createPathFromPoints(data);
-    },
-    onSuccess: async (data) => {
-      // Get discretized points
+  const generatePathMutation = useMutation<PathResponse, Error, CreatePathFromPointsRequest>({
+    mutationFn: async (data: CreatePathFromPointsRequest) => {
       try {
-        const pathResponse = await apiService.getPath(data.path_id, true);
-        if (onSuccess) {
-          onSuccess(data.path_id, pathResponse.discretized_points || [], pathResponse.curves || []);
-        }
-        // Invalidate queries that might be affected
-        queryClient.invalidateQueries({ queryKey: ['path', data.path_id] });
+        // Use local bezierService instead of API
+        const response = bezierService.createPathFromPoints(data);
+        return Promise.resolve(response);
       } catch (error) {
-        console.error('Error fetching path details:', error);
-        if (onError) {
-          onError(error instanceof Error ? error : new Error('Unknown error'));
-        }
+        console.error('Error in local path generation:', error);
+        throw error;
       }
+    },
+    onSuccess: (data) => {
+      if (onSuccess) {
+        onSuccess(data.path_id, data.discretized_points || [], data.curves || []);
+      }
+      // Invalidate queries that might be affected
+      queryClient.invalidateQueries({ queryKey: ['path', data.path_id] });
     },
     onError: (error: Error) => {
       console.error('Error generating path:', error);

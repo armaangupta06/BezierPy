@@ -8,6 +8,7 @@ import ControlPanel from '@/components/Controls/ControlPanel';
 import HeadingInputModal from '@/components/Modals/HeadingInputModal';
 import HeadingsInputModal from '@/components/Modals/HeadingsInputModal';
 import ControlPointsEditor from '@/components/Controls/ControlPointsEditor';
+import BezierScriptLoader from '@/components/BezierScriptLoader';
 import { PoseModel, PointModel, BezierCurveModel, PathResponse } from '@/services/api';
 import usePathGeneration from '@/hooks/usePathGeneration';
 import usePathFromPointsGeneration from '@/hooks/usePathFromPointsGeneration';
@@ -735,7 +736,12 @@ function HomePage() {
 export default function Home() {
   return (
     <QueryClientProvider client={queryClient}>
-      <HomePage />
+      <BezierScriptLoader
+        onLoad={() => console.log('Bezier scripts loaded successfully')}
+        onError={(error) => console.error('Error loading Bezier scripts:', error)}
+      >
+        <HomePage />
+      </BezierScriptLoader>
     </QueryClientProvider>
   );
 }

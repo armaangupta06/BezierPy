@@ -233,6 +233,8 @@ def calc_bezier_curve_with_poses(curr, path, tangent_magnitude):
             acc1 = alpha * (6 * path[curr] + 2 * v0 + 4 * v1 - 6 * path[curr + 1]) + beta * (
                     -6 * path[curr + 1] - 4 * v1 - 2 * vD + 6 * path[curr + 2])
 
+            
+
     # If point is second to last point on path
     elif curr == len(path) - 2:
         if curr - 1 == 0:

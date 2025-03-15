@@ -6,6 +6,7 @@ import apiService, {
   CreatePathFromPosesRequest, 
   PathResponse 
 } from '@/services/api';
+import bezierService from '@/services/bezierService';
 
 interface UsePathGenerationProps {
   queryClient: QueryClient;
@@ -24,24 +25,23 @@ export default function usePathGeneration({
   const [isLoading, setIsLoading] = useState(false);
 
   // Create path from poses
-  const createPathFromPosesMutation = useMutation({
-    mutationFn: (data: CreatePathFromPosesRequest) => 
-      apiService.createPathFromPoses(data),
-    onSuccess: async (data) => {
-      // Get discretized points
+  const createPathFromPosesMutation = useMutation<PathResponse, Error, CreatePathFromPosesRequest>({
+    mutationFn: async (data: CreatePathFromPosesRequest) => {
       try {
-        const pathResponse = await apiService.getPath(data.path_id, true);
-        if (onSuccess) {
-          onSuccess(data.path_id, pathResponse.discretized_points || [], pathResponse.curves || []);
-        }
-        // Invalidate queries that might be affected
-        queryClient.invalidateQueries({ queryKey: ['path', data.path_id] });
+        // Use local bezierService instead of API
+        const response = bezierService.createPathFromPoses(data);
+        return Promise.resolve(response);
       } catch (error) {
-        console.error('Error fetching path details:', error);
-        if (onError) {
-          onError(error instanceof Error ? error : new Error('Unknown error'));
-        }
+        console.error('Error in local path generation:', error);
+        throw error;
       }
+    },
+    onSuccess: (data) => {
+      if (onSuccess) {
+        onSuccess(data.path_id, data.discretized_points || [], data.curves || []);
+      }
+      // Invalidate queries that might be affected
+      queryClient.invalidateQueries({ queryKey: ['path', data.path_id] });
     },
     onError: (error: Error) => {
       console.error('Error generating path:', error);

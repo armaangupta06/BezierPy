@@ -4,6 +4,7 @@ import apiService, {
   TrajectoryParamsModel, 
   TrajectoryResponse 
 } from '@/services/api';
+import bezierService from '@/services/bezierService';
 
 interface UseTrajectoryGenerationProps {
   queryClient: QueryClient;
@@ -21,23 +22,27 @@ export default function useTrajectoryGeneration({
 }: UseTrajectoryGenerationProps) {
   const [isLoading, setIsLoading] = useState(false);
   // Generate trajectory from path
-  const generateTrajectoryMutation = useMutation({
-    mutationFn: ({ pathId, params }: { pathId: string, params: TrajectoryParamsModel }) => 
-      apiService.generateTrajectory(pathId, params),
-    onSuccess: async (data) => {
+  const generateTrajectoryMutation = useMutation<
+    TrajectoryResponse, 
+    Error, 
+    { pathId: string, params: TrajectoryParamsModel }
+  >({
+    mutationFn: async ({ pathId, params }) => {
       try {
-        const trajectoryResponse = await apiService.getTrajectory(data.trajectory_id);
-        if (onSuccess) {
-          onSuccess(data.trajectory_id, trajectoryResponse.points || []);
-        }
-        // Invalidate queries that might be affected
-        queryClient.invalidateQueries({ queryKey: ['trajectory', data.trajectory_id] });
+        // Use local bezierService instead of API
+        const response = bezierService.generateTrajectory(pathId, params);
+        return Promise.resolve(response);
       } catch (error) {
-        console.error('Error fetching trajectory details:', error);
-        if (onError) {
-          onError(error instanceof Error ? error : new Error('Unknown error'));
-        }
+        console.error('Error in local trajectory generation:', error);
+        throw error;
       }
+    },
+    onSuccess: (data) => {
+      if (onSuccess) {
+        onSuccess(data.trajectory_id, data.points || []);
+      }
+      // Invalidate queries that might be affected
+      queryClient.invalidateQueries({ queryKey: ['trajectory', data.trajectory_id] });
     },
     onError: (error: Error) => {
       console.error('Error generating trajectory:', error);
