@@ -36,8 +36,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,  # Use environment variable in production
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
+    max_age=600  # How long the results of a preflight request can be cached
 )
 
 # Include routers
