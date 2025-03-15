@@ -9,6 +9,7 @@ import HeadingInputModal from '@/components/Modals/HeadingInputModal';
 import HeadingsInputModal from '@/components/Modals/HeadingsInputModal';
 import ControlPointsEditor from '@/components/Controls/ControlPointsEditor';
 import BezierScriptLoader from '@/components/BezierScriptLoader';
+import TrajectoryTimeDisplay from '@/components/TrajectoryTimeDisplay';
 import { PoseModel, PointModel, BezierCurveModel, PathResponse } from '@/services/api';
 import usePathGeneration from '@/hooks/usePathGeneration';
 import usePathFromPointsGeneration from '@/hooks/usePathFromPointsGeneration';
@@ -40,6 +41,7 @@ function HomePage() {
   const [pathPoints, setPathPoints] = useState<any[]>([]);
   const [trajectoryId, setTrajectoryId] = useState<string | null>(null);
   const [trajectoryPoints, setTrajectoryPoints] = useState<any[]>([]);
+  const [trajectoryTime, setTrajectoryTime] = useState<number | null>(null);
   const [showTrajectory, setShowTrajectory] = useState(false);
   
   // State for control point editing
@@ -125,8 +127,14 @@ function HomePage() {
         heading: heading,
       };
       
-      setPoses([...poses, newPose]);
+      const updatedPoses = [...poses, newPose];
+      setPoses(updatedPoses);
       setIsHeadingModalOpen(false);
+      
+      // Auto-generate path if we have at least 2 poses
+      if (updatedPoses.length >= 2) {
+        generatePathFromPoses(updatedPoses, pathParams.tangentMagnitude);
+      }
     }
   };
   
@@ -134,6 +142,11 @@ function HomePage() {
     setInitialHeading(initialHeading);
     setFinalHeading(finalHeading);
     setIsHeadingsModalOpen(false);
+    
+    // Auto-generate path if we have at least 2 points
+    if (pathCreationMethod === 'points' && points.length >= 2) {
+      generatePathFromPoints(points, initialHeading, finalHeading, pathParams.tangentMagnitude);
+    }
   };
   
   const handleMovePoint = (index: number, x: number, y: number) => {
@@ -333,11 +346,20 @@ function HomePage() {
   // Path generation hooks
   const { generatePath: generatePathFromPoses } = usePathGeneration({
     queryClient,
-    onSuccess: (pathId: string, points: any[], curves?: any[]) => {
+    onSuccess: async (pathId: string, points: any[], curves?: any[]) => {
       setPathId(pathId);
       setPathPoints(points);
-      setTrajectoryId(null);
-      setTrajectoryPoints([]);
+      
+      // If showTrajectory is true, automatically regenerate the trajectory
+      if (showTrajectory) {
+        // Keep the trajectory visible while updating
+        await generateTrajectoryIfNeeded(pathId);
+      } else {
+        // If no trajectory is showing, just clear the trajectory data
+        setTrajectoryId(null);
+        setTrajectoryPoints([]);
+      }
+      
       // Reset control points edited flag when a new path is generated from poses
       setAreControlPointsEdited(false);
       console.log('Path generated from poses, areControlPointsEdited set to false');
@@ -398,11 +420,20 @@ function HomePage() {
   
   const { generatePath: generatePathFromPoints } = usePathFromPointsGeneration({
     queryClient,
-    onSuccess: (pathId: string, points: any[], curves?: any[]) => {
+    onSuccess: async (pathId: string, points: any[], curves?: any[]) => {
       setPathId(pathId);
       setPathPoints(points);
-      setTrajectoryId(null);
-      setTrajectoryPoints([]);
+      
+      // If showTrajectory is true, automatically regenerate the trajectory
+      if (showTrajectory) {
+        // Keep the trajectory visible while updating
+        await generateTrajectoryIfNeeded(pathId);
+      } else {
+        // If no trajectory is showing, just clear the trajectory data
+        setTrajectoryId(null);
+        setTrajectoryPoints([]);
+      }
+      
       // Reset control points edited flag when a new path is generated from points
       setAreControlPointsEdited(false);
       console.log('Path generated from points, areControlPointsEdited set to false');
@@ -463,11 +494,20 @@ function HomePage() {
   
   const { generatePath: generatePathFromControlPoints } = usePathFromControlPointsGeneration({
     queryClient,
-    onSuccess: (pathId: string, points: any[], curves?: any[]) => {
+    onSuccess: async (pathId: string, points: any[], curves?: any[]) => {
       setPathId(pathId);
       setPathPoints(points);
-      setTrajectoryId(null);
-      setTrajectoryPoints([]);
+      
+      // If showTrajectory is true, automatically regenerate the trajectory
+      if (showTrajectory) {
+        // Keep the trajectory visible while updating
+        await generateTrajectoryIfNeeded(pathId);
+      } else {
+        // If no trajectory is showing, just clear the trajectory data
+        setTrajectoryId(null);
+        setTrajectoryPoints([]);
+      }
+      
       // Note: We don't reset areControlPointsEdited here because this is called when control points are edited
       
       // Log the curves data to see its structure
@@ -530,9 +570,10 @@ function HomePage() {
   // Trajectory generation
   const { generateTrajectory } = useTrajectoryGeneration({
     queryClient,
-    onSuccess: (trajectoryId: string, points: any[]) => {
+    onSuccess: (trajectoryId: string, points: any[], totalTime?: number) => {
       setTrajectoryId(trajectoryId);
       setTrajectoryPoints(points);
+      setTrajectoryTime(totalTime || null);
       setShowTrajectory(true);
     },
     onError: (error: Error) => {
@@ -580,6 +621,33 @@ function HomePage() {
     }
   };
   
+  // Helper function to generate trajectory if a path exists and showTrajectory is true
+  const generateTrajectoryIfNeeded = async (currentPathId: string) => {
+    // Only generate trajectory if showTrajectory is true (meaning a trajectory was previously generated)
+    if (showTrajectory && currentPathId) {
+      try {
+        // Convert parameters to API format
+        const apiParams = {
+          initial_velocity: trajectoryParams.initialVelocity,
+          final_velocity: trajectoryParams.finalVelocity,
+          max_velocity: trajectoryParams.maxVelocity,
+          acceleration: trajectoryParams.acceleration,
+          // Ensure deceleration is negative as required by the backend
+          deceleration: -Math.abs(trajectoryParams.deceleration),
+          max_jerk: trajectoryParams.maxJerk,
+          max_angular_velocity: trajectoryParams.maxAngularVelocity,
+          use_trapezoidal: trajectoryParams.useTrapezoidalProfile,
+        };
+        
+        // Use the hook to generate trajectory
+        await generateTrajectory(currentPathId, apiParams);
+      } catch (error: any) {
+        console.error('Error auto-generating trajectory:', error);
+        // Don't show alert for automatic regeneration to avoid disrupting the user
+      }
+    }
+  };
+  
   const handleGenerateTrajectory = async () => {
     if (!pathId) {
       alert('Please generate a path first');
@@ -610,6 +678,11 @@ function HomePage() {
     }
   };
   
+  // Handle closing the trajectory display
+  const handleCloseTrajectory = () => {
+    setShowTrajectory(false);
+  };
+  
   return (
     <QueryClientProvider client={queryClient}>
       <MainLayout
@@ -622,8 +695,83 @@ function HomePage() {
         }}
       >
         <div className="flex flex-1 overflow-hidden">
+          {/* Left sidebar for trajectory info */}
+          {showTrajectory && trajectoryTime && (
+            <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 pt-10 flex flex-col gap-4 overflow-y-auto relative">
+              {/* Close button - positioned at the top right with higher z-index */}
+              <button 
+                onClick={handleCloseTrajectory}
+                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white transition-colors z-20"
+                aria-label="Close trajectory view"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {/* Time Card */}
+              <div className="bg-gray-900/80 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-md border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs uppercase tracking-wider text-gray-400">Trajectory Time</div>
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                </div>
+                <div className="flex items-baseline">
+                  <span className="text-2xl font-bold text-white">{trajectoryTime.toFixed(2)}</span>
+                  <span className="ml-1 text-gray-300 text-sm">seconds</span>
+                </div>
+              </div>
+              
+              {/* Velocity Card */}
+              <div className="bg-gray-900/80 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-md border border-gray-700">
+                <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">Velocity</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-400">Initial</div>
+                    <div className="text-sm font-medium">{trajectoryParams.initialVelocity} m/s</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Final</div>
+                    <div className="text-sm font-medium">{trajectoryParams.finalVelocity} m/s</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Maximum</div>
+                    <div className="text-sm font-medium">{trajectoryParams.maxVelocity} m/s</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Acceleration Card */}
+              <div className="bg-gray-900/80 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-md border border-gray-700">
+                <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">Acceleration</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-400">Acceleration</div>
+                    <div className="text-sm font-medium">{trajectoryParams.acceleration} m/s²</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Deceleration</div>
+                    <div className="text-sm font-medium">{trajectoryParams.deceleration} m/s²</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Points Card */}
+              <div className="bg-gray-900/80 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-md border border-gray-700">
+                <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">Data Points</div>
+                <div className="text-lg font-medium">{trajectoryPoints.length} points</div>
+              </div>
+              
+              {/* Profile Type */}
+              <div className="bg-gray-900/80 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-md border border-gray-700">
+                <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">Profile Type</div>
+                <div className="text-md font-medium">
+                  {trajectoryParams.useTrapezoidalProfile ? 'Trapezoidal' : 'S-Curve'}
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Main canvas area */}
-          <div className="flex-1 flex items-center justify-center bg-gray-900 p-4">
+          <div className="flex-1 flex items-center justify-center bg-gray-900 p-4 relative overflow-hidden">
             <PathCanvas
               poses={pathCreationMethod === 'poses' ? poses : []}
               points={pathCreationMethod === 'points' ? points : []}

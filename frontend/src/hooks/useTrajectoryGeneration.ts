@@ -8,7 +8,7 @@ import bezierService from '@/services/bezierService';
 
 interface UseTrajectoryGenerationProps {
   queryClient: QueryClient;
-  onSuccess?: (trajectoryId: string, points: any[]) => void;
+  onSuccess?: (trajectoryId: string, points: any[], totalTime?: number) => void;
   onError?: (error: Error) => void;
 }
 
@@ -39,7 +39,7 @@ export default function useTrajectoryGeneration({
     },
     onSuccess: (data) => {
       if (onSuccess) {
-        onSuccess(data.trajectory_id, data.points || []);
+        onSuccess(data.trajectory_id, data.points || [], data.total_time);
       }
       // Invalidate queries that might be affected
       queryClient.invalidateQueries({ queryKey: ['trajectory', data.trajectory_id] });

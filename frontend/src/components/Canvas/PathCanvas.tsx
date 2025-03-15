@@ -632,7 +632,8 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
   return (
     <div 
       ref={canvasRef}
-      className="relative w-full h-full overflow-hidden bg-gray-900 cursor-crosshair"
+      className="relative bg-gray-900 cursor-crosshair"
+      style={{ width: canvasSize.width, height: canvasSize.height }}
       onMouseMove={handleMouseMove}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -641,11 +642,7 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
       {/* Game field background */}
       <div 
         className="absolute inset-0 bg-center bg-no-repeat bg-contain"
-        style={{ 
-          backgroundImage: 'url(/images/high_stakes_field.png)',
-          width: canvasSize.width,
-          height: canvasSize.height
-        }}
+        style={{ backgroundImage: 'url(/images/high_stakes_field.png)' }}
       />
       
       {/* SVG overlay for drawing paths and points */}
