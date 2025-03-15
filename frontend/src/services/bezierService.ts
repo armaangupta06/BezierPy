@@ -230,13 +230,38 @@ export const bezierService = {
   
   // Generate trajectory
   generateTrajectory(pathId: string, params: TrajectoryParamsModel): TrajectoryResponse {
-    const path = pathsStorage[pathId];
+    try {
+      const path = pathsStorage[pathId];
+      
+      if (!path) {
+        throw new Error(`Path with ID ${pathId} not found`);
+      }
+      
+      // Generate trajectory using our JavaScript implementation
+      console.log('Generating trajectory with params:', params);
+      
+      // Check if bezierCurves exists and is an array
+      if (!path.bezierCurves || !Array.isArray(path.bezierCurves)) {
+        console.error('Invalid bezierCurves:', path.bezierCurves);
+        throw new Error('Invalid bezierCurves: Must be a non-empty array');
+      }
+      
+      // Check if bezierCurves has the expected methods
+      if (path.bezierCurves.length > 0) {
+        const firstCurve = path.bezierCurves[0];
+        console.log('First curve in bezierCurves:', firstCurve);
+        console.log('Methods available on first curve:', Object.getOwnPropertyNames(firstCurve));
+        console.log('Prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(firstCurve)));
+        
+        // Check if calcArcLength method exists
+        if (!firstCurve.calcArcLength || typeof firstCurve.calcArcLength !== 'function') {
+          console.error('calcArcLength method missing on curve object');
+          throw new Error('Curve objects must have calcArcLength method');
+        }
+      }
+      
+      console.log('Path bezierCurves:', path.bezierCurves);
     
-    if (!path) {
-      throw new Error(`Path with ID ${pathId} not found`);
-    }
-    
-    // Generate trajectory using our JavaScript implementation
     // @ts-ignore - using the global function
     const trajectoryPoints = calculateTrajectory(
       path.bezierCurves,
@@ -249,6 +274,17 @@ export const bezierService = {
       params.max_angular_velocity,
       params.use_trapezoidal
     );
+    
+    console.log('Calculated trajectory points:', trajectoryPoints.length);
+    // Log a sample of trajectory points
+    if (trajectoryPoints.length > 0) {
+      console.log('First trajectory point:', trajectoryPoints[0]);
+      if (trajectoryPoints.length > 1) {
+        console.log('Last trajectory point:', trajectoryPoints[trajectoryPoints.length - 1]);
+      }
+    } else {
+      console.warn('No trajectory points were generated!');
+    }
     
     // Generate a unique ID for the trajectory
     const trajectoryId = generateUniqueId();
@@ -272,6 +308,10 @@ export const bezierService = {
       })),
       total_time: trajectoryPoints.length * 0.01
     };
+    } catch (error) {
+      console.error('Error in generateTrajectory:', error);
+      throw error;
+    }
   },
   
   // Get trajectory

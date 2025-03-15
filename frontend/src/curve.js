@@ -37,14 +37,32 @@ export function generatePoints(path) {
    * Matches Python's 'calculate_trajectory' function.
    */
   export function calculateTrajectory(path, v0, v1, max_v, a_accel, a_decel, max_j, max_w, trap = true) {
+    try {
+      console.log('calculateTrajectory called with:', { v0, v1, max_v, a_accel, a_decel, max_j, max_w, trap });
+      
+      // Validate inputs
+      if (!path || !Array.isArray(path) || path.length === 0) {
+        console.error('Invalid path:', path);
+        throw new Error('Invalid path: Path must be a non-empty array');
+      }
+      console.log('Path length:', path.length);
+      
+      // Check if path elements have the required methods
+      if (!path[0].calcArcLength || typeof path[0].calcArcLength !== 'function') {
+        console.error('Path element missing calcArcLength method:', path[0]);
+        throw new Error('Path elements must have calcArcLength method');
+      }
     const steps = [];
     let arcLength = 0.0;
     let s = 0.01;  // ‘s’ tracks distance traveled along the total path
     
     // Sum total arc length over all curves (Python: for curve in path: arcLength += curve.calc_arc_length())
     for (const curve of path) {
-      arcLength += curve.calcArcLength();
+      const curveLength = curve.calcArcLength();
+      console.log('Curve arc length:', curveLength);
+      arcLength += curveLength;
     }
+    console.log('Total arc length:', arcLength);
     
     // Go curve by curve
     for (const curve of path) {
@@ -86,10 +104,29 @@ export function generatePoints(path) {
         // We replicate: new Path_Point(..., curvature, velocity)
         // If your Path_Point constructor is (point, curvature, velocity, theta),
         // you can pass 'undefined' or 0 for theta here since Python does not store it in calc_trajectory.
-        steps.push(new Path_Point(pose, curvature, velocity));
+        const theta = Math.atan2(deriv.x, deriv.y) * (180 / Math.PI);
+        const pathPoint = new Path_Point(pose, curvature, velocity, theta);
+        
+        // Debug log every 20th point
+        if (steps.length % 20 === 0) {
+          console.log('Creating trajectory point:', {
+            x: pose.x,
+            y: pose.y,
+            curvature,
+            velocity,
+            theta
+          });
+        }
+        
+        steps.push(pathPoint);
       }
     }
+    console.log(`Generated ${steps.length} trajectory points`);
     return steps;
+    } catch (error) {
+      console.error('Error in calculateTrajectory:', error);
+      throw error;
+    }
   }
   
   /**

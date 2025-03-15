@@ -66,4 +66,6 @@ export class Quintic_Bezier {
     }
     return distance;
   }
+  
+
 }
