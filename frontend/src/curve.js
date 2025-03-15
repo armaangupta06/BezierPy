@@ -99,24 +99,17 @@ export function generatePoints(path) {
         const magVelocity = magnitude(deriv);
         const delta_t = deltaS / magVelocity;
         t += delta_t;
+
+
         
         // In Python, they just do: steps.append(Path_Point(pose, curvature, velocity=velocity))
         // We replicate: new Path_Point(..., curvature, velocity)
         // If your Path_Point constructor is (point, curvature, velocity, theta),
         // you can pass 'undefined' or 0 for theta here since Python does not store it in calc_trajectory.
-        const theta = Math.atan2(deriv.x, deriv.y) * (180 / Math.PI);
-        const pathPoint = new Path_Point(pose, curvature, velocity, theta);
-        
+        let theta = Math.atan2(deriv.x, deriv.y) * (180 / Math.PI);
+        const pathPoint = new Path_Point(pose, curvature, theta, velocity);
         // Debug log every 20th point
-        if (steps.length % 20 === 0) {
-          console.log('Creating trajectory point:', {
-            x: pose.x,
-            y: pose.y,
-            curvature,
-            velocity,
-            theta
-          });
-        }
+
         
         steps.push(pathPoint);
       }

@@ -230,7 +230,7 @@ function HomePage() {
       setControlPointsList(newControlPointsList);
     }
     
-    // Update the actual points if the first or last control points were modified
+    // Update the actual points if control points were modified
     if (newControlPointsList.length > 0) {
       // If we're using poses, update the poses
       if (pathCreationMethod === 'poses' && poses.length >= 2) {
@@ -244,6 +244,24 @@ function HomePage() {
             x: firstPoint.x,
             y: firstPoint.y
           };
+        }
+        
+        // Update intermediate poses based on the waypoints (last point of each curve)
+        // Skip the last curve as its endpoint is handled separately
+        for (let i = 0; i < newControlPointsList.length - 1; i++) {
+          const curve = newControlPointsList[i];
+          // The last point of each curve (P5) is a waypoint
+          if (curve && curve.control_points.length > 0) {
+            const waypointIndex = i + 1; // The pose index is offset by 1 from the curve index
+            if (waypointIndex < updatedPoses.length) {
+              const waypoint = curve.control_points[curve.control_points.length - 1];
+              updatedPoses[waypointIndex] = {
+                ...updatedPoses[waypointIndex],
+                x: waypoint.x,
+                y: waypoint.y
+              };
+            }
+          }
         }
         
         // Update last pose position from last control point
@@ -271,6 +289,24 @@ function HomePage() {
             x: firstPoint.x,
             y: firstPoint.y
           };
+        }
+        
+        // Update intermediate points based on the waypoints (last point of each curve)
+        // Skip the last curve as its endpoint is handled separately
+        for (let i = 0; i < newControlPointsList.length - 1; i++) {
+          const curve = newControlPointsList[i];
+          // The last point of each curve (P5) is a waypoint
+          if (curve && curve.control_points.length > 0) {
+            const waypointIndex = i + 1; // The point index is offset by 1 from the curve index
+            if (waypointIndex < updatedPoints.length) {
+              const waypoint = curve.control_points[curve.control_points.length - 1];
+              updatedPoints[waypointIndex] = {
+                ...updatedPoints[waypointIndex],
+                x: waypoint.x,
+                y: waypoint.y
+              };
+            }
+          }
         }
         
         // Update last point position from last control point

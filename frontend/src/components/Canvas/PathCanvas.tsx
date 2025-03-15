@@ -80,7 +80,15 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
         const originalPoint = updatedControlPointsArray[pointIndex];
         console.log('Moving control point from:', originalPoint, 'to:', { x: worldCoords[0], y: worldCoords[1] });
         
-        // Update just the specific point that changed
+        // Check if this is the last point of a curve (P5) and not the last curve
+        const isLastPointOfCurve = pointIndex === updatedControlPointsArray.length - 1;
+        const isNotLastCurve = curveIndex < controlPointsList.length - 1;
+        
+        // Check if this is the first point of a curve (P0) and not the first curve
+        const isFirstPointOfCurve = pointIndex === 0;
+        const isNotFirstCurve = curveIndex > 0;
+        
+        // Update the current point
         updatedControlPointsArray[pointIndex] = {
           ...updatedControlPointsArray[pointIndex],
           x: worldCoords[0],
@@ -89,6 +97,42 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
         
         updatedCurve.control_points = updatedControlPointsArray;
         updatedControlPoints[curveIndex] = updatedCurve;
+        
+        // If this is the last point of a curve (P5) and not the last curve,
+        // also update the first point (P0) of the next curve
+        if (isLastPointOfCurve && isNotLastCurve) {
+          console.log('Synchronizing with first point of next curve');
+          const nextCurve = { ...updatedControlPoints[curveIndex + 1] };
+          const nextCurvePoints = [...nextCurve.control_points];
+          
+          // Update the first point of the next curve
+          nextCurvePoints[0] = {
+            ...nextCurvePoints[0],
+            x: worldCoords[0],
+            y: worldCoords[1]
+          };
+          
+          nextCurve.control_points = nextCurvePoints;
+          updatedControlPoints[curveIndex + 1] = nextCurve;
+        }
+        
+        // If this is the first point of a curve (P0) and not the first curve,
+        // also update the last point (P5) of the previous curve
+        if (isFirstPointOfCurve && isNotFirstCurve) {
+          console.log('Synchronizing with last point of previous curve');
+          const prevCurve = { ...updatedControlPoints[curveIndex - 1] };
+          const prevCurvePoints = [...prevCurve.control_points];
+          
+          // Update the last point of the previous curve
+          prevCurvePoints[prevCurvePoints.length - 1] = {
+            ...prevCurvePoints[prevCurvePoints.length - 1],
+            x: worldCoords[0],
+            y: worldCoords[1]
+          };
+          
+          prevCurve.control_points = prevCurvePoints;
+          updatedControlPoints[curveIndex - 1] = prevCurve;
+        }
         
         // Call the callback to update the control points
         onControlPointsChange(updatedControlPoints);
@@ -642,7 +686,11 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
       {/* Game field background */}
       <div 
         className="absolute inset-0 bg-center bg-no-repeat bg-contain"
-        style={{ backgroundImage: 'url(/images/high_stakes_field.png)' }}
+        style={{ 
+          backgroundImage: 'url(/images/high_stakes_field.png)',
+          width: canvasSize.width,
+          height: canvasSize.height
+        }}
       />
       
       {/* SVG overlay for drawing paths and points */}
