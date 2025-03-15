@@ -43,7 +43,7 @@ export function generatePoints(path) {
     
     // Sum total arc length over all curves (Python: for curve in path: arcLength += curve.calc_arc_length())
     for (const curve of path) {
-      arcLength += curve.calc_arc_length();
+      arcLength += curve.calcArcLength();
     }
     
     // Go curve by curve
