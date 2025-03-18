@@ -177,7 +177,7 @@ const ToolsControls: React.FC<ToolsControlsProps> = ({
             <input
               type="range"
               min="2"
-              max="30"
+              max="20"
               step="1"
               value={pointRadiusInInches * 2}
               onChange={(e) => onPointRadiusChange(parseFloat(e.target.value) / 2)}
