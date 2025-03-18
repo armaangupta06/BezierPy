@@ -36,7 +36,7 @@ const PathControls: React.FC<PathControlsProps> = ({
               <input
                 type="range"
                 min="0.1"
-                max="2"
+                max="3"
                 step="0.1"
                 value={params.tangentMagnitude}
                 onChange={handleTangentMagnitudeChange}

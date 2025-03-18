@@ -43,6 +43,12 @@ interface ControlPanelProps {
   controlPointsList: BezierCurveModel[];
   initialHeading?: number;
   finalHeading?: number;
+  onPointsFromCppCode?: (points: { x: number, y: number }[]) => void;
+  // Props for point and pose size control
+  pointRadiusInInches?: number;
+  poseRadiusInInches?: number;
+  onPointRadiusChange?: (radius: number) => void;
+  onPoseRadiusChange?: (radius: number) => void;
 }
 
 /**
@@ -72,7 +78,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   points = [],
   controlPointsList = [],
   initialHeading,
-  finalHeading
+  finalHeading,
+  onPointsFromCppCode,
+  pointRadiusInInches,
+  poseRadiusInInches,
+  onPointRadiusChange = () => {},
+  onPoseRadiusChange = () => {}
 }) => {
   const [activeTab, setActiveTab] = useState<'tools' | 'path' | 'trajectory'>('tools');
   const [pathSubTab, setPathSubTab] = useState<'params' | 'creation-method'>('params');
@@ -147,6 +158,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   tangentMagnitude={pathParams.tangentMagnitude}
                   trajectoryParams={trajectoryParams}
                   areControlPointsEdited={areControlPointsEdited}
+                  onPointsFromCppCode={onPointsFromCppCode}
+                  pointRadiusInInches={pointRadiusInInches}
+                  poseRadiusInInches={poseRadiusInInches}
+                  onPointRadiusChange={onPointRadiusChange}
+                  onPoseRadiusChange={onPoseRadiusChange}
                 />
               </div>
             )}

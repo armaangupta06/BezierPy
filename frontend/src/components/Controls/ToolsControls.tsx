@@ -1,7 +1,20 @@
 import React from 'react';
 import { FiTrash2, FiEye, FiEyeOff, FiX } from 'react-icons/fi';
 import GetCodeButton from './GetCodeButton';
+import CppCodeImport from '@/components/CppCodeImport';
 import { PoseModel, PointModel, BezierCurveModel } from '@/services/api';
+
+interface TrajectoryParams {
+  initialVelocity: number;
+  finalVelocity: number;
+  maxVelocity: number;
+  acceleration: number;
+  deceleration: number;
+  maxAngularVelocity: number;
+  tangentMagnitude?: number;
+  finalAngle?: number;
+  reversed?: boolean;
+}
 
 interface ToolsControlsProps {
   onClearPoints: () => void;
@@ -27,6 +40,12 @@ interface ToolsControlsProps {
     useTrapezoidalProfile: boolean;
   };
   areControlPointsEdited: boolean;
+  onPointsFromCppCode?: (points: { x: number, y: number }[], params?: TrajectoryParams) => void;
+  // New props for point and pose size control
+  pointRadiusInInches?: number;
+  poseRadiusInInches?: number;
+  onPointRadiusChange?: (radius: number) => void;
+  onPoseRadiusChange?: (radius: number) => void;
 }
 
 /**
@@ -46,7 +65,13 @@ const ToolsControls: React.FC<ToolsControlsProps> = ({
   finalHeading,
   tangentMagnitude,
   trajectoryParams,
-  areControlPointsEdited
+  areControlPointsEdited,
+  onPointsFromCppCode = () => {},
+  // New props for point and pose size control
+  pointRadiusInInches = 14.5 / 2, // Default from coordinate-transforms.ts
+  poseRadiusInInches = 10 / 2, // Default value
+  onPointRadiusChange = () => {},
+  onPoseRadiusChange = () => {}
 }) => {
   return (
     <div className="space-y-6">
@@ -104,17 +129,24 @@ const ToolsControls: React.FC<ToolsControlsProps> = ({
         <h3 className="text-lg font-medium text-white mb-4">Code Generation</h3>
         
         <div className="space-y-3">
-          <GetCodeButton
-            pathCreationMethod={pathCreationMethod}
-            poses={poses}
-            points={points}
-            controlPointsList={controlPointsList}
-            initialHeading={initialHeading}
-            finalHeading={finalHeading}
-            tangentMagnitude={tangentMagnitude}
-            trajectoryParams={trajectoryParams}
-            areControlPointsEdited={areControlPointsEdited}
-          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <GetCodeButton
+                pathCreationMethod={pathCreationMethod}
+                poses={poses}
+                points={points}
+                controlPointsList={controlPointsList}
+                initialHeading={initialHeading}
+                finalHeading={finalHeading}
+                tangentMagnitude={tangentMagnitude}
+                trajectoryParams={trajectoryParams}
+                areControlPointsEdited={areControlPointsEdited}
+              />
+            </div>
+            <div className="flex-1">
+              <CppCodeImport onPointsExtracted={onPointsFromCppCode} />
+            </div>
+          </div>
         </div>
       </div>
       
@@ -128,6 +160,49 @@ const ToolsControls: React.FC<ToolsControlsProps> = ({
           <p>Generate a path after adding at least 2 points</p>
           <p>Generate a trajectory after creating a path</p>
           <p>Use <span className="text-blue-400">Get Code</span> to generate C++ code</p>
+        </div>
+      </div>
+      
+      {/* Size Controls */}
+      <div className="bg-gray-900 rounded-lg p-4">
+        <h3 className="text-lg font-medium text-white mb-4">Size Controls</h3>
+        
+        <div className="space-y-4">
+          {/* Point Size Slider */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm font-medium text-gray-400">Point Size</label>
+              <span className="text-xs text-gray-500">{(pointRadiusInInches * 2).toFixed(1)}" diameter</span>
+            </div>
+            <input
+              type="range"
+              min="2"
+              max="30"
+              step="1"
+              value={pointRadiusInInches * 2}
+              onChange={(e) => onPointRadiusChange(parseFloat(e.target.value) / 2)}
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+          
+          {/* Pose Size Slider */}
+          {pathCreationMethod === 'poses' && (
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium text-gray-400">Pose Size</label>
+                <span className="text-xs text-gray-500">{(poseRadiusInInches * 2).toFixed(1)}" diameter</span>
+              </div>
+              <input
+                type="range"
+                min="2"
+                max="20"
+                step="1"
+                value={poseRadiusInInches * 2}
+                onChange={(e) => onPoseRadiusChange(parseFloat(e.target.value) / 2)}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -96,10 +96,12 @@ const generatePointsCode = (
     return '// Not enough points to generate a path';
   }
 
-  const pointsVector = points.map(p => `Point{${roundTo(p.x)}, ${roundTo(p.y)}}`).join(', ');
+  const pointsVector = points.map(p => `Point(${roundTo(p.x)}, ${roundTo(p.y)})`).join(', ');
   const finalAngle = finalHeading !== undefined ? roundTo(finalHeading) : 'current_heading()';
 
-  return `chassis.motion_profiling({${pointsVector}}, ${typeof finalAngle === 'number' ? finalAngle : finalAngle}, ${roundTo(tangentMagnitude)}, ${roundTo(trajectoryParams.finalVelocity)}, ${roundTo(trajectoryParams.maxVelocity)}, ${roundTo(trajectoryParams.acceleration)}, ${roundTo(Math.abs(trajectoryParams.deceleration))}, ${roundTo(trajectoryParams.maxAngularVelocity)}, ${reversed});`;
+  // Convert angular velocity from degrees to radians
+  const angularVelocityRad = trajectoryParams.maxAngularVelocity * (Math.PI / 180);
+  return `chassis.motion_profiling({${pointsVector}}, ${typeof finalAngle === 'number' ? finalAngle : finalAngle}, ${roundTo(tangentMagnitude)}, ${roundTo(trajectoryParams.finalVelocity)}, ${roundTo(trajectoryParams.maxVelocity)}, ${roundTo(trajectoryParams.acceleration)}, ${roundTo(Math.abs(trajectoryParams.deceleration))}, ${roundTo(angularVelocityRad, 3)}, ${reversed});`;
 };
 
 /**
@@ -115,9 +117,11 @@ const generatePosesCode = (
     return '// Not enough poses to generate a path';
   }
 
-  const posesVector = poses.map(p => `Pose{${roundTo(p.x)}, ${roundTo(p.y)}, ${roundTo(p.heading)}}`).join(', ');
+  const posesVector = poses.map(p => `Pose(${roundTo(p.x)}, ${roundTo(p.y)}, ${roundTo(p.heading)})`).join(', ');
 
-  return `chassis.motion_profiling({${posesVector}}, ${roundTo(tangentMagnitude)}, ${roundTo(trajectoryParams.finalVelocity)}, ${roundTo(trajectoryParams.maxVelocity)}, ${roundTo(trajectoryParams.acceleration)}, ${roundTo(Math.abs(trajectoryParams.deceleration))}, ${roundTo(trajectoryParams.maxAngularVelocity)}, ${reversed});`;
+  // Convert angular velocity from degrees to radians
+  const angularVelocityRad = trajectoryParams.maxAngularVelocity * (Math.PI / 180);
+  return `chassis.motion_profiling({${posesVector}}, ${roundTo(tangentMagnitude)}, ${roundTo(trajectoryParams.finalVelocity)}, ${roundTo(trajectoryParams.maxVelocity)}, ${roundTo(trajectoryParams.acceleration)}, ${roundTo(Math.abs(trajectoryParams.deceleration))}, ${roundTo(angularVelocityRad, 3)}, ${reversed});`;
 };
 
 /**
@@ -138,8 +142,10 @@ const generateControlPointsCode = (
       return '// Invalid control points';
     }
 
-    return `Quintic_Bezier{Point{${roundTo(points[0].x)}, ${roundTo(points[0].y)}}, Point{${roundTo(points[1].x)}, ${roundTo(points[1].y)}}, Point{${roundTo(points[2].x)}, ${roundTo(points[2].y)}}, Point{${roundTo(points[3].x)}, ${roundTo(points[3].y)}}, Point{${roundTo(points[4].x)}, ${roundTo(points[4].y)}}, Point{${roundTo(points[5].x)}, ${roundTo(points[5].y)}}}`;
+    return `Quintic_Bezier(Point(${roundTo(points[0].x)}, ${roundTo(points[0].y)}), Point(${roundTo(points[1].x)}, ${roundTo(points[1].y)}), Point(${roundTo(points[2].x)}, ${roundTo(points[2].y)}), Point(${roundTo(points[3].x)}, ${roundTo(points[3].y)}), Point(${roundTo(points[4].x)}, ${roundTo(points[4].y)}), Point(${roundTo(points[5].x)}, ${roundTo(points[5].y)}))`;
   }).join(', ');
 
-  return `chassis.motion_profiling({${curvesCode}}, ${roundTo(trajectoryParams.finalVelocity)}, ${roundTo(trajectoryParams.maxVelocity)}, ${roundTo(trajectoryParams.acceleration)}, ${roundTo(Math.abs(trajectoryParams.deceleration))}, ${roundTo(trajectoryParams.maxAngularVelocity)}, ${reversed});`;
+  // Convert angular velocity from degrees to radians
+  const angularVelocityRad = trajectoryParams.maxAngularVelocity * (Math.PI / 180);
+  return `chassis.motion_profiling({${curvesCode}}, ${roundTo(trajectoryParams.finalVelocity)}, ${roundTo(trajectoryParams.maxVelocity)}, ${roundTo(trajectoryParams.acceleration)}, ${roundTo(Math.abs(trajectoryParams.deceleration))}, ${roundTo(angularVelocityRad, 3)}, ${reversed});`;
 };

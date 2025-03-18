@@ -2,47 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FiX } from 'react-icons/fi';
 
-interface HeadingInputModalProps {
+interface PointInputModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (heading: number, x: number, y: number) => void;
+  onConfirm: (x: number, y: number) => void;
   position: { x: number; y: number };
   isEditMode?: boolean;
-  initialHeading?: number;
 }
 
 /**
- * Modal for inputting heading when adding a new point
+ * Modal for inputting/editing point coordinates
  */
-const HeadingInputModal: React.FC<HeadingInputModalProps> = ({
+const PointInputModal: React.FC<PointInputModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
   position,
-  isEditMode = false,
-  initialHeading = 0
+  isEditMode = false
 }) => {
-  const [headingValue, setHeadingValue] = useState<string>('0');
   const [xValue, setXValue] = useState<string>('');
   const [yValue, setYValue] = useState<string>('');
-  const [headingError, setHeadingError] = useState<string>('');
   const [coordError, setCoordError] = useState<string>('');
   
   // Reset values when modal opens
   useEffect(() => {
     if (isOpen) {
-      setHeadingValue(isEditMode && initialHeading !== undefined ? initialHeading.toString() : '0');
       setXValue(position.x.toFixed(2));
       setYValue(position.y.toFixed(2));
-      setHeadingError('');
       setCoordError('');
     }
-  }, [isOpen, position, isEditMode, initialHeading]);
-
-  const handleHeadingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setHeadingValue(e.target.value);
-    setHeadingError('');
-  };
+  }, [isOpen, position]);
 
   const handleXChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setXValue(e.target.value);
@@ -72,18 +61,6 @@ const HeadingInputModal: React.FC<HeadingInputModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate heading
-    const parsedHeading = parseFloat(headingValue);
-    if (isNaN(parsedHeading)) {
-      setHeadingError('Please enter a valid number');
-      return;
-    }
-    
-    if (parsedHeading < -180 || parsedHeading > 180) {
-      setHeadingError('Value must be between -180 and 180');
-      return;
-    }
-
     // Validate coordinates
     const parsedX = parseFloat(xValue);
     const parsedY = parseFloat(yValue);
@@ -95,7 +72,7 @@ const HeadingInputModal: React.FC<HeadingInputModalProps> = ({
     
     // Prevent any potential double-submission
     if (isOpen) {
-      onConfirm(parsedHeading, parsedX, parsedY);
+      onConfirm(parsedX, parsedY);
     }
   };
 
@@ -139,6 +116,7 @@ const HeadingInputModal: React.FC<HeadingInputModalProps> = ({
                   value={xValue}
                   onChange={handleXChange}
                   className={`w-full bg-gray-700 border ${coordError ? 'border-red-500' : 'border-gray-600'} rounded-md px-3 py-2 text-white`}
+                  autoFocus
                 />
               </div>
               <div className="relative flex-1">
@@ -156,30 +134,7 @@ const HeadingInputModal: React.FC<HeadingInputModalProps> = ({
                 {coordError}
               </div>
             )}
-            
-            <label className="block text-sm font-medium text-gray-400 mb-1 mt-4">
-              Heading (degrees)
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={headingValue}
-                onChange={handleHeadingChange}
-                className={`w-full bg-gray-700 border ${headingError ? 'border-red-500' : 'border-gray-600'} rounded-md px-3 py-2 text-white pr-8`}
-                autoFocus
-              />
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <span className="text-gray-400">°</span>
-              </div>
-            </div>
-            {headingError && (
-              <div className="mt-1 text-sm text-red-500">
-                {headingError}
-              </div>
-            )}
           </div>
-          
-
           
           <div className="flex space-x-3">
             <button
@@ -196,12 +151,10 @@ const HeadingInputModal: React.FC<HeadingInputModalProps> = ({
               <span>{isEditMode ? 'Update Point' : 'Add Point'}</span>
             </button>
           </div>
-          
-
         </form>
       </motion.div>
     </motion.div>
   );
 };
 
-export default HeadingInputModal;
+export default PointInputModal;

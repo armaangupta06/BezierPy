@@ -49,12 +49,27 @@ export const pixelsToCoord = (
 };
 
 /**
- * Calculate point radius in pixels based on canvas size
+ * Calculate point radius in pixels based on canvas size and custom radius in inches
  * @param canvasSize Canvas dimensions in pixels
+ * @param radiusInInches Optional custom radius in inches
  * @returns Point radius in pixels
  */
-export const getPointRadius = (canvasSize = DEFAULT_CANVAS_SIZE): number => {
+export const getPointRadius = (canvasSize = DEFAULT_CANVAS_SIZE, radiusInInches?: number): number => {
   const inchToPixel = getInchToPixelRatio(canvasSize.width);
-  // 14.5/2 inches is the diameter used in the original visualizer
-  return (14.5 / 2) * inchToPixel;
+  // Default is 14.5/2 inches (the diameter used in the original visualizer)
+  const radius = radiusInInches !== undefined ? radiusInInches : (14.5 / 2);
+  return radius * inchToPixel;
+};
+
+/**
+ * Calculate pose circle radius in pixels based on canvas size and custom radius in inches
+ * @param canvasSize Canvas dimensions in pixels
+ * @param radiusInInches Optional custom radius in inches
+ * @returns Pose circle radius in pixels
+ */
+export const getPoseRadius = (canvasSize = DEFAULT_CANVAS_SIZE, radiusInInches?: number): number => {
+  const inchToPixel = getInchToPixelRatio(canvasSize.width);
+  // Default is 10/2 inches
+  const radius = radiusInInches !== undefined ? radiusInInches : (10 / 2);
+  return radius * inchToPixel;
 };

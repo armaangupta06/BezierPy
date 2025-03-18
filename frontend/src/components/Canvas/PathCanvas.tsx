@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { coordToPixels, pixelsToCoord, getPointRadius } from '@/utils/coordinate-transforms';
+import { FiEdit2 } from 'react-icons/fi';
+import { coordToPixels, pixelsToCoord, getPointRadius, getPoseRadius } from '@/utils/coordinate-transforms';
 import { generatePathPoints } from '@/utils/bezier-utils';
 import { PoseModel, PointModel, BezierCurveModel } from '@/services/api';
 
@@ -19,6 +20,9 @@ interface PathCanvasProps {
   pathCreationMethod?: 'poses' | 'points' | 'control-points';
   onControlPointsChange?: (controlPoints: BezierCurveModel[]) => void;
   onUpdatePoseHeading?: (index: number, heading: number) => void;
+  onEditPoint?: (index: number) => void;
+  pointRadiusInInches?: number;
+  poseRadiusInInches?: number;
 }
 
 const PathCanvas: React.FC<PathCanvasProps> = ({
@@ -36,12 +40,16 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
   pathCreationMethod = 'poses',
   onControlPointsChange,
   onUpdatePoseHeading,
+  onEditPoint,
+  pointRadiusInInches,
+  poseRadiusInInches,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPointIndex, setDragPointIndex] = useState<number | null>(null);
   const [mousePosition, setMousePosition] = useState<[number, number] | null>(null);
-  const pointRadius = getPointRadius(canvasSize);
+  const pointRadius = getPointRadius(canvasSize, pointRadiusInInches);
+  const poseRadius = getPoseRadius(canvasSize, poseRadiusInInches);
   
   // State for heading editing
   const [isEditingHeading, setIsEditingHeading] = useState(false);
@@ -230,6 +238,13 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
 
   // Handle mouse down on canvas
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Check if the click originated from an edit icon
+    // @ts-ignore - dataset is available on the target element
+    if (e.target && e.target.dataset && e.target.dataset.editIcon === 'true') {
+      console.log('Edit icon clicked, ignoring canvas click');
+      return;
+    }
+    
     if (!canvasRef.current) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
@@ -280,7 +295,11 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
           const [px, py] = coordToPixels([point.x, point.y], canvasSize);
           const distance = Math.sqrt(Math.pow(px - x, 2) + Math.pow(py - y, 2));
           
-          if (distance <= pointRadius * 0.8) {
+          // Use the actual circle radius for the hitbox
+          const isEndpoint = j === 0 || j === curve.control_points.length - 1;
+          const circleRadius = isEndpoint ? pointRadius * 0.45 : pointRadius * 0.3;
+          
+          if (distance <= circleRadius) {
             console.log('Found control point at curve', i, 'point', j);
             // Found a control point - set it for dragging
             setDragControlPoint({ curveIndex: i, pointIndex: j });
@@ -413,8 +432,8 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
       // Calculate heading angle in radians
       const headingRad = pose.heading * Math.PI / 180;
       
-      // Make everything smaller
-      const smallerPointRadius = pointRadius * 0.7;
+      // Use the pose radius instead of point radius
+      const smallerPointRadius = poseRadius * 0.7;
       
       // Calculate arrow endpoint - make it proportional to smaller radius
       const arrowLength = smallerPointRadius * (isSelected ? 2.5 : 2.2);
@@ -505,6 +524,68 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
           {isSelected && !isEditingHeading && (
             <title>Drag the direction indicator to change heading</title>
           )}
+          
+          {/* Edit icon for selected pose - positioned to avoid heading indicator */}
+          {isSelected && !isEditingHeading && onEditPoint && (
+            <g 
+              className="cursor-pointer" 
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditPoint(index);
+              }}
+              data-edit-icon="true"
+            >
+              {/* Calculate position to avoid overlap with heading indicator */}
+              {(() => {
+                // Convert heading to radians and calculate the opposite direction
+                const headingRad = (pose.heading * Math.PI) / 180;
+                const oppositeHeadingRad = headingRad + Math.PI;
+                
+                // Check if heading is pointing to the top-right quadrant (where edit icon normally is)
+                const isHeadingInTopRight = (pose.heading >= -45 && pose.heading <= 45) || 
+                                          (pose.heading >= 315 && pose.heading <= 360) || 
+                                          (pose.heading >= -360 && pose.heading <= -315);
+                
+                // If heading is in top-right quadrant, place edit icon in bottom-left
+                // Otherwise, keep it in the default top-right position
+                const editIconOffsetX = isHeadingInTopRight ? -pointRadius * 1.0 : pointRadius * 1.0;
+                const editIconOffsetY = isHeadingInTopRight ? pointRadius * 1.0 : -pointRadius * 1.0;
+                
+                return (
+                  <>
+                    <motion.circle 
+                      cx={x + editIconOffsetX} 
+                      cy={y + editIconOffsetY} 
+                      r={pointRadius * 0.3}
+                      fill="rgba(255, 255, 255, 0.8)"
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                      whileHover={{ scale: 1.2 }}
+                    />
+                    <foreignObject 
+                      x={x + editIconOffsetX - pointRadius * 0.25} 
+                      y={y + editIconOffsetY - pointRadius * 0.25} 
+                      width={pointRadius * 0.5} 
+                      height={pointRadius * 0.5}
+                      data-edit-icon="true"
+                    >
+                      <div 
+                        className="flex items-center justify-center h-full"
+                        data-edit-icon="true"
+                      >
+                        <FiEdit2 
+                          className="text-gray-800" 
+                          size={pointRadius * 0.3} 
+                          data-edit-icon="true"
+                        />
+                      </div>
+                    </foreignObject>
+                  </>
+                );
+              })()} 
+            </g>
+          )}
         </g>
       );
     });
@@ -559,6 +640,47 @@ const PathCanvas: React.FC<PathCanvasProps> = ({
           >
             {index + 1}
           </text>
+          
+          {/* Edit icon for selected point */}
+          {isSelected && onEditPoint && (
+            <g 
+              className="cursor-pointer" 
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditPoint(index);
+              }}
+              data-edit-icon="true"
+            >
+              <motion.circle 
+                cx={x + pointRadius * 1.0} 
+                cy={y - pointRadius * 1.0} 
+                r={pointRadius * 0.3}
+                fill="rgba(255, 255, 255, 0.8)"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                whileHover={{ scale: 1.2 }}
+              />
+              <foreignObject 
+                x={x + pointRadius * 1.0 - pointRadius * 0.25} 
+                y={y - pointRadius * 1.0 - pointRadius * 0.25} 
+                width={pointRadius * 0.5} 
+                height={pointRadius * 0.5}
+                data-edit-icon="true"
+              >
+                <div 
+                  className="flex items-center justify-center h-full"
+                  data-edit-icon="true"
+                >
+                  <FiEdit2 
+                    className="text-gray-800" 
+                    size={pointRadius * 0.3} 
+                    data-edit-icon="true"
+                  />
+                </div>
+              </foreignObject>
+            </g>
+          )}
         </g>
       );
     });

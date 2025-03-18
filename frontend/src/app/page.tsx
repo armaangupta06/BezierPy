@@ -7,9 +7,11 @@ import PathCanvas from '@/components/Canvas/PathCanvas';
 import ControlPanel from '@/components/Controls/ControlPanel';
 import HeadingInputModal from '@/components/Modals/HeadingInputModal';
 import HeadingsInputModal from '@/components/Modals/HeadingsInputModal';
+import PointInputModal from '@/components/Modals/PointInputModal';
 import ControlPointsEditor from '@/components/Controls/ControlPointsEditor';
 import BezierScriptLoader from '@/components/BezierScriptLoader';
 import TrajectoryTimeDisplay from '@/components/TrajectoryTimeDisplay';
+import CppCodeImport from '@/components/CppCodeImport';
 import { PoseModel, PointModel, BezierCurveModel, PathResponse } from '@/services/api';
 import usePathGeneration from '@/hooks/usePathGeneration';
 import usePathFromPointsGeneration from '@/hooks/usePathFromPointsGeneration';
@@ -48,9 +50,15 @@ function HomePage() {
   const [isEditingControlPoints, setIsEditingControlPoints] = useState(false);
   const [pathControlPoints, setPathControlPoints] = useState<BezierCurveModel[]>([]);
   
-  // State for heading input modals
+  // State for point and pose radii (in inches)
+  const [pointRadiusInInches, setPointRadiusInInches] = useState<number>(18 / 2); // Default diameter of 18 inches
+  const [poseRadiusInInches, setPoseRadiusInInches] = useState<number>(18 / 2); // Default diameter of 18 inches
+  
+  // State for input modals
   const [isHeadingModalOpen, setIsHeadingModalOpen] = useState(false);
   const [isHeadingsModalOpen, setIsHeadingsModalOpen] = useState(false);
+  const [isPointModalOpen, setIsPointModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [newPointPosition, setNewPointPosition] = useState({ x: 0, y: 0 });
   
   // State for initial/final headings (for points method)
@@ -103,31 +111,82 @@ function HomePage() {
   // Handlers for point operations based on creation method
   const handleAddPointPosition = (x: number, y: number) => {
     setNewPointPosition({ x, y });
+    setIsEditMode(false);
     
     if (pathCreationMethod === 'poses') {
       setIsHeadingModalOpen(true);
     } else if (pathCreationMethod === 'points') {
-      // For points method, just add the point directly
-      const newPoint: PointModel = { x, y };
-      setPoints([...points, newPoint]);
-      
-      // If we have at least 2 points, show the headings modal
-      if (points.length >= 1) {
-        setIsHeadingsModalOpen(true);
-      }
+      // For points method, show the point input modal to confirm coordinates
+      setIsPointModalOpen(true);
     }
     // For control-points method, points are added through the editor
   };
   
-  const handleAddPointWithHeading = (heading: number) => {
+  // Handle editing an existing point
+  const handleEditPoint = (index: number) => {
+    setSelectedPointIndex(index);
+    setIsEditMode(true);
+    
+    if (pathCreationMethod === 'poses') {
+      // For poses, set the current position and open the heading modal
+      const pose = poses[index];
+      setNewPointPosition({ x: pose.x, y: pose.y });
+      setIsHeadingModalOpen(true);
+    } else if (pathCreationMethod === 'points') {
+      // For points, set the current position and open the point modal
+      const point = points[index];
+      setNewPointPosition({ x: point.x, y: point.y });
+      setIsPointModalOpen(true);
+    }
+  };
+  
+  const handleAddPointWithCoordinates = (x: number, y: number) => {
+    if (isEditMode && selectedPointIndex !== null && selectedPointIndex < points.length) {
+      // Update existing point
+      const updatedPoints = [...points];
+      updatedPoints[selectedPointIndex] = { x, y };
+      setPoints(updatedPoints);
+      setSelectedPointIndex(null);
+      setIsEditMode(false);
+      
+      // Regenerate path if needed
+      if (pathId && updatedPoints.length >= 2 && initialHeading !== undefined) {
+        generatePathFromPoints(updatedPoints, initialHeading, finalHeading, pathParams.tangentMagnitude);
+      }
+    } else {
+      // Add new point
+      const newPoint: PointModel = { x, y };
+      const updatedPoints = [...points, newPoint];
+      setPoints(updatedPoints);
+      
+      // If we have at least 2 points, show the headings modal
+      if (updatedPoints.length >= 2) {
+        setIsHeadingsModalOpen(true);
+      }
+    }
+    setIsPointModalOpen(false);
+  };
+  
+  const handleAddPointWithHeading = (heading: number, x: number, y: number) => {
     if (pathCreationMethod === 'poses') {
       const newPose: PoseModel = {
-        x: newPointPosition.x,
-        y: newPointPosition.y,
+        x: x,
+        y: y,
         heading: heading,
       };
       
-      const updatedPoses = [...poses, newPose];
+      let updatedPoses;
+      if (isEditMode && selectedPointIndex !== null && selectedPointIndex < poses.length) {
+        // Update existing pose
+        updatedPoses = [...poses];
+        updatedPoses[selectedPointIndex] = newPose;
+        setSelectedPointIndex(null);
+        setIsEditMode(false);
+      } else {
+        // Add new pose
+        updatedPoses = [...poses, newPose];
+      }
+      
       setPoses(updatedPoses);
       setIsHeadingModalOpen(false);
       
@@ -657,6 +716,206 @@ function HomePage() {
     }
   };
   
+  // Handle points imported from C++ code
+  const handlePointsFromCppCode = (points: { x: number, y: number }[], params?: {
+    initialVelocity: number;
+    finalVelocity: number;
+    maxVelocity: number;
+    acceleration: number;
+    deceleration: number;
+    maxAngularVelocity: number;
+    tangentMagnitude?: number;
+    finalAngle?: number;
+    initialHeading?: number;
+    reversed?: boolean;
+    hasPoses?: boolean;
+    hasControlPoints?: boolean;
+    poseHeadings?: number[];
+  }) => {
+    if (points.length < 2) {
+      alert('At least 2 points are needed to create a path');
+      return;
+    }
+
+    // Convert to the expected format for points
+    const formattedPoints = points.map(point => ({
+      x: point.x,
+      y: point.y
+    }));
+
+    // Determine the path creation method based on what we found
+    if (params?.hasControlPoints) {
+      setPathCreationMethod('control-points');
+    } else if (params?.hasPoses) {
+      setPathCreationMethod('poses');
+    } else {
+      setPathCreationMethod('points');
+    }
+    
+    // Handle different path types
+    if (params?.hasControlPoints) {
+      // For control points, we need to group them into sets of 6 for each Bezier curve
+      const controlPointsList: BezierCurveModel[] = [];
+      
+      // Each Bezier curve has 6 control points
+      for (let i = 0; i < formattedPoints.length; i += 6) {
+        if (i + 5 < formattedPoints.length) {
+          // We have enough points for a complete curve
+          const curvePoints = formattedPoints.slice(i, i + 6);
+          controlPointsList.push({
+            control_points: curvePoints.map(p => ({ x: p.x, y: p.y }))
+          });
+        }
+      }
+      
+      // Set the control points list
+      setControlPointsList(controlPointsList);
+      setAreControlPointsEdited(true);
+      
+    } else if (params?.hasPoses) {
+      // Create poses from points with headings
+      const posesWithHeadings = formattedPoints.map((point, index) => {
+        // If we have specific headings for each pose, use those
+        if (params.poseHeadings && params.poseHeadings[index] !== undefined) {
+          return {
+            x: point.x,
+            y: point.y,
+            heading: params.poseHeadings[index]
+          };
+        }
+        
+        // Otherwise fall back to initial/final headings
+        let heading = params?.initialHeading !== undefined ? params.initialHeading : (initialHeading || 0);
+        
+        // If it's the last point and we have a final angle, use that
+        if (index === formattedPoints.length - 1 && params?.finalAngle !== undefined) {
+          heading = params.finalAngle;
+        }
+        
+        return {
+          x: point.x,
+          y: point.y,
+          heading: heading
+        };
+      });
+      
+      // Set the poses
+      setPoses(posesWithHeadings);
+    } else {
+      // Set the points
+      setPoints(formattedPoints);
+    }
+    
+    // Update trajectory parameters if provided
+    if (params) {
+      const updatedTrajectoryParams = { ...trajectoryParams };
+      
+      if (params.initialVelocity !== undefined) {
+        updatedTrajectoryParams.initialVelocity = params.initialVelocity;
+      }
+      
+      if (params.finalVelocity !== undefined) {
+        updatedTrajectoryParams.finalVelocity = params.finalVelocity;
+      }
+      
+      if (params.maxVelocity !== undefined) {
+        updatedTrajectoryParams.maxVelocity = params.maxVelocity;
+      }
+      
+      if (params.acceleration !== undefined) {
+        updatedTrajectoryParams.acceleration = params.acceleration;
+      }
+      
+      if (params.deceleration !== undefined) {
+        // Ensure deceleration is negative
+        updatedTrajectoryParams.deceleration = params.deceleration;
+      }
+      
+      if (params.maxAngularVelocity !== undefined) {
+        updatedTrajectoryParams.maxAngularVelocity = params.maxAngularVelocity;
+      }
+      
+      // Update the trajectory parameters
+      setTrajectoryParams(updatedTrajectoryParams);
+      
+      // Update path params if tangent magnitude is provided
+      if (params.tangentMagnitude !== undefined) {
+        setPathParams(prev => ({
+          ...prev,
+          tangentMagnitude: params.tangentMagnitude || prev.tangentMagnitude
+        }));
+      }
+      
+      // Update headings if provided
+      if (params.initialHeading !== undefined) {
+        setInitialHeading(params.initialHeading);
+      }
+      
+      if (params.finalAngle !== undefined) {
+        setFinalHeading(params.finalAngle);
+      }
+    }
+    
+    // Generate path from these points or poses
+    if (formattedPoints.length >= 2) {
+      // Use updated tangent magnitude if available
+      const tangentMagnitude = params?.tangentMagnitude !== undefined 
+        ? params.tangentMagnitude 
+        : pathParams.tangentMagnitude;
+      
+      // Use updated headings if available
+      const initialHeadingToUse = params?.initialHeading !== undefined 
+        ? params.initialHeading 
+        : initialHeading;
+        
+      const finalHeadingToUse = params?.finalAngle !== undefined 
+        ? params.finalAngle 
+        : finalHeading;
+      
+      if (params?.hasControlPoints) {
+        // For control points, we need to generate the path from the control points list
+        // This should already be set up in the state, so use it directly
+        generatePathFromControlPoints(controlPointsList);
+      } else if (params?.hasPoses) {
+        // Generate path from poses
+        const posesWithHeadings = formattedPoints.map((point, index) => {
+          // If we have specific headings for each pose, use those
+          if (params.poseHeadings && params.poseHeadings[index] !== undefined) {
+            return {
+              x: point.x,
+              y: point.y,
+              heading: params.poseHeadings[index]
+            };
+          }
+          
+          // Otherwise fall back to initial/final headings
+          let heading = initialHeadingToUse || 0;
+          
+          // If it's the last point and we have a final angle, use that
+          if (index === formattedPoints.length - 1) {
+            heading = finalHeadingToUse || 0;
+          }
+          
+          return {
+            x: point.x,
+            y: point.y,
+            heading: heading
+          };
+        });
+        
+        generatePathFromPoses(posesWithHeadings, tangentMagnitude);
+      } else {
+        // Generate path from points
+        generatePathFromPoints(
+          formattedPoints,
+          initialHeadingToUse,
+          finalHeadingToUse,
+          tangentMagnitude
+        );
+      }
+    }
+  };
+
   // Helper function to generate trajectory if a path exists and showTrajectory is true
   const generateTrajectoryIfNeeded = async (currentPathId: string) => {
     // Only generate trajectory if showTrajectory is true (meaning a trajectory was previously generated)
@@ -823,6 +1082,9 @@ function HomePage() {
               canvasSize={canvasSize}
               pathCreationMethod={pathCreationMethod}
               onControlPointsChange={handleControlPointsChange}
+              onEditPoint={handleEditPoint}
+              pointRadiusInInches={pointRadiusInInches}
+              poseRadiusInInches={poseRadiusInInches}
             />
           </div>
           
@@ -881,15 +1143,25 @@ function HomePage() {
             initialHeading={initialHeading}
             finalHeading={finalHeading}
             areControlPointsEdited={areControlPointsEdited}
+            onPointsFromCppCode={handlePointsFromCppCode}
+            pointRadiusInInches={pointRadiusInInches}
+            poseRadiusInInches={poseRadiusInInches}
+            onPointRadiusChange={setPointRadiusInInches}
+            onPoseRadiusChange={setPoseRadiusInInches}
           />
         </div>
         
         {/* Heading input modal for poses */}
         <HeadingInputModal
           isOpen={isHeadingModalOpen}
-          onClose={() => setIsHeadingModalOpen(false)}
+          onClose={() => {
+            setIsHeadingModalOpen(false);
+            setIsEditMode(false);
+          }}
           onConfirm={handleAddPointWithHeading}
           position={newPointPosition}
+          isEditMode={isEditMode}
+          initialHeading={isEditMode && selectedPointIndex !== null && selectedPointIndex < poses.length ? poses[selectedPointIndex].heading : 0}
         />
         
         {/* Headings input modal for points */}
@@ -899,6 +1171,19 @@ function HomePage() {
           onConfirm={handleSetPathHeadings}
           initialHeading={initialHeading}
           finalHeading={finalHeading}
+          points={points}
+        />
+        
+        {/* Point input modal for points */}
+        <PointInputModal
+          isOpen={isPointModalOpen}
+          onClose={() => {
+            setIsPointModalOpen(false);
+            setIsEditMode(false);
+          }}
+          onConfirm={handleAddPointWithCoordinates}
+          position={newPointPosition}
+          isEditMode={isEditMode}
         />
         
         {/* Control points editor (rendered conditionally inside the control panel) */}

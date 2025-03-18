@@ -7,6 +7,7 @@ interface HeadingsInputModalProps {
   onConfirm: (initialHeading: number, finalHeading?: number) => void;
   initialHeading?: number;
   finalHeading?: number;
+  points?: { x: number, y: number }[];
 }
 
 /**
@@ -18,6 +19,7 @@ const HeadingsInputModal: React.FC<HeadingsInputModalProps> = ({
   onConfirm,
   initialHeading: defaultInitialHeading = 0,
   finalHeading: defaultFinalHeading,
+  points = [],
 }) => {
   const [initialInputValue, setInitialInputValue] = useState<string>(defaultInitialHeading.toString());
   const [finalInputValue, setFinalInputValue] = useState<string>(
@@ -94,6 +96,19 @@ const HeadingsInputModal: React.FC<HeadingsInputModalProps> = ({
         className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm mx-4"
       >
         <h2 className="text-lg font-medium text-white mb-4">Set Path Headings</h2>
+        
+        {points.length > 0 && (
+          <div className="mb-4 bg-gray-700 rounded-md p-3">
+            <h3 className="text-sm font-medium text-gray-300 mb-2">Points Added:</h3>
+            <div className="max-h-24 overflow-y-auto">
+              {points.map((point, index) => (
+                <div key={index} className="text-xs text-gray-400 mb-1">
+                  Point {index + 1}: ({point.x.toFixed(2)}, {point.y.toFixed(2)})
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
